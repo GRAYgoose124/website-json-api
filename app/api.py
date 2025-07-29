@@ -9,8 +9,6 @@ from pathlib import Path
 
 from .models import Notice, NoticeType, WorkflowStatus, WorkflowDefinition, WorkflowInstance, StepDefinition, DependencyResolution
 from .core import notice_manager, step_registry, workflow_engine
-from .step.loader import StepLoader
-from .dependency_resolver import DependencyResolver
 
 # Create FastAPI app
 app = FastAPI(title="Scientific Workflow API")
@@ -25,15 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize step loader
-step_loader = StepLoader()
-
-# Initialize dependency resolver
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the dependency resolver after steps are loaded"""
-    dependency_resolver = DependencyResolver(step_registry.definitions)
-    step_registry.set_dependency_resolver(dependency_resolver)
+# Note: Dependency resolver is now initialized in core.py during application startup
 
 @app.post("/upload-file")
 async def upload_file(file: UploadFile = File(...)):
@@ -115,14 +105,20 @@ async def get_available_steps(
     search: Optional[str] = Query(None, description="Search in name, description, or tags")
 ):
     """Get available steps with optional filtering"""
+    definitions = step_registry.definitions
+    
     if category:
-        return step_loader.get_steps_by_category(category)
+        return {k: v for k, v in definitions.items() if v.category == category}
     elif tag:
-        return step_loader.get_steps_by_tag(tag)
+        return {k: v for k, v in definitions.items() if tag in v.tags}
     elif search:
-        return step_loader.search_steps(search)
+        search_lower = search.lower()
+        return {
+            k: v for k, v in definitions.items() 
+            if search_lower in v.name.lower() or search_lower in v.description.lower() or any(search_lower in tag.lower() for tag in v.tags)
+        }
     else:
-        return step_registry.definitions
+        return definitions
 
 @app.get("/steps/categories")
 async def get_step_categories():
