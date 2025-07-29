@@ -74,7 +74,7 @@ class DependencyResolver:
         cycles = self._detect_cycles(dependencies)
         
         # Find execution order (topological sort)
-        execution_order = self._topological_sort(dependencies)
+        execution_order = self._topological_sort(dependencies, workflow)
         
         # Find missing dependencies
         missing_dependencies = []
@@ -132,13 +132,16 @@ class DependencyResolver:
         
         return cycles
     
-    def _topological_sort(self, dependencies: Dict[str, List[str]]) -> List[str]:
+    def _topological_sort(self, dependencies: Dict[str, List[str]], workflow: WorkflowDefinition) -> List[str]:
         """Perform topological sort to determine execution order"""
-        # Calculate in-degrees
+        # Calculate in-degrees for all steps in the workflow
         in_degree = defaultdict(int)
-        for node in dependencies:
-            in_degree[node] = 0
         
+        # Initialize in-degree for all steps (including those without dependencies)
+        for step in workflow.steps:
+            in_degree[step.step_id] = 0
+        
+        # Add dependencies to in-degree calculation
         for node, deps in dependencies.items():
             for dep in deps:
                 in_degree[node] += 1
@@ -158,9 +161,9 @@ class DependencyResolver:
                     queue.append(dependent)
         
         # Check for cycles (if not all nodes are in result)
-        if len(result) != len(dependencies):
+        if len(result) != len(in_degree):
             # Find nodes not in result (part of cycles)
-            remaining = set(dependencies.keys()) - set(result)
+            remaining = set(in_degree.keys()) - set(result)
             result.extend(list(remaining))
         
         return result

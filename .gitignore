@@ -11,3 +11,6 @@ wheels/
 *.lock
 node_modules/
 **/package-lock.json
+
+projects/
+uploads/

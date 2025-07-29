@@ -2,8 +2,9 @@ import argparse
 import sys
 from pathlib import Path
 from app.api import app
-from app.core import step_registry
+from app.core import step_registry, project_manager
 from app.step_loader import StepLoader
+from app.dependency_resolver import DependencyResolver
 
 def main():
     parser = argparse.ArgumentParser(description="Workflow API Server")
@@ -12,6 +13,12 @@ def main():
         type=str, 
         required=True,
         help="Path to directory containing custom step definitions and implementations"
+    )
+    parser.add_argument(
+        "--projects-root",
+        type=str,
+        default=None,
+        help="Root directory for projects (default: ./projects)"
     )
     parser.add_argument(
         "--host", 
@@ -27,6 +34,12 @@ def main():
     )
     
     args = parser.parse_args()
+    
+    # Configure project manager with custom projects root if provided
+    if args.projects_root:
+        project_manager.projects_root = Path(args.projects_root).resolve()
+        project_manager.projects_root.mkdir(parents=True, exist_ok=True)
+        print(f"Using projects directory: {project_manager.projects_root}")
     
     # Load steps from config root
     print(f"Loading steps from: {args.config_root}")
@@ -49,6 +62,11 @@ def main():
                 print(f"Registered step: {step_id}")
             else:
                 print(f"Warning: No implementation found for step: {step_id}")
+        
+        # Initialize dependency resolver after steps are registered
+        dependency_resolver = DependencyResolver(step_registry.definitions)
+        step_registry.set_dependency_resolver(dependency_resolver)
+        print("Dependency resolver initialized")
         
         print(f"Successfully loaded {len(step_definitions)} step definitions")
         

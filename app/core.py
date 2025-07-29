@@ -2,8 +2,81 @@ from typing import List, Dict, Optional, Any, Callable
 from datetime import datetime
 import asyncio
 import traceback
+import os
+import uuid
+import hashlib
+from pathlib import Path
 from .models import Notice, NoticeType, NoticeSeverity, WorkflowStatus, StepDefinition, WorkflowInstance, DependencyResolution
 from .dependency_resolver import DependencyResolver
+
+class ProjectManager:
+    """Manages project isolation and security"""
+    
+    def __init__(self, projects_root: str = None):
+        if projects_root is None:
+            # Use a local projects directory in the current working directory
+            import os
+            projects_root = os.path.join(os.getcwd(), "projects")
+        
+        self.projects_root = Path(projects_root).resolve()
+        self.projects_root.mkdir(parents=True, exist_ok=True)
+        self.project_tokens: Dict[str, Dict[str, Any]] = {}  # token_hash -> project_info
+    
+    def create_project(self, project_name: str, description: str = "") -> Dict[str, Any]:
+        """Create a new isolated project"""
+        # Generate project UUID
+        project_id = str(uuid.uuid4())
+        
+        # Create project directory (isolated)
+        project_path = self.projects_root / project_id
+        project_path.mkdir(parents=True, exist_ok=True)
+        
+        # Generate secure project token
+        raw_token = f"{project_id}_{datetime.utcnow().isoformat()}_{uuid.uuid4()}"
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        
+        # Store project info
+        project_info = {
+            'project_id': project_id,
+            'project_path': str(project_path),
+            'project_name': project_name,
+            'description': description,
+            'created_at': datetime.utcnow().isoformat(),
+            'raw_token': raw_token
+        }
+        self.project_tokens[token_hash] = project_info
+        
+        # Create project metadata file
+        metadata = {
+            'project_id': project_id,
+            'project_name': project_name,
+            'description': description,
+            'created_at': project_info['created_at'],
+            'token_hash': token_hash
+        }
+        
+        metadata_path = project_path / '.project_metadata.json'
+        import json
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        return {
+            'project_id': project_id,
+            'project_path': str(project_path),
+            'project_token': token_hash
+        }
+    
+    def validate_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """Validate a project token and return project info"""
+        return self.project_tokens.get(token)
+    
+    def get_project_path(self, token: str) -> Optional[str]:
+        """Get project path for a valid token"""
+        project_info = self.validate_token(token)
+        return project_info['project_path'] if project_info else None
+
+# Global project manager instance
+project_manager = ProjectManager()
 
 class NoticeManager:
     def __init__(self):
@@ -98,51 +171,55 @@ class StepContext:
         self.step_id = step_id
         self.notice_manager = notice_manager
         self.workflow_context = workflow_context
-        self.step_result = None
+        self._result = None
     
     async def info(self, title: str, message: str, **kwargs):
-        await self.notice_manager.emit(Notice(
+        notice = Notice(
             type=NoticeType.INFO,
             severity=NoticeSeverity.LOW,
             title=title,
             message=message,
             workflow_id=self.workflow_id,
             step_id=self.step_id,
-            **kwargs
-        ))
+            metadata=kwargs
+        )
+        await self.notice_manager.emit(notice)
     
     async def warning(self, title: str, message: str, **kwargs):
-        await self.notice_manager.emit(Notice(
+        notice = Notice(
             type=NoticeType.WARNING,
             severity=NoticeSeverity.MEDIUM,
             title=title,
             message=message,
             workflow_id=self.workflow_id,
             step_id=self.step_id,
-            **kwargs
-        ))
+            metadata=kwargs
+        )
+        await self.notice_manager.emit(notice)
     
     async def error(self, title: str, message: str, **kwargs):
-        await self.notice_manager.emit(Notice(
+        notice = Notice(
             type=NoticeType.ERROR,
             severity=NoticeSeverity.HIGH,
             title=title,
             message=message,
             workflow_id=self.workflow_id,
             step_id=self.step_id,
-            **kwargs
-        ))
+            metadata=kwargs
+        )
+        await self.notice_manager.emit(notice)
     
     async def success(self, title: str, message: str, **kwargs):
-        await self.notice_manager.emit(Notice(
+        notice = Notice(
             type=NoticeType.SUCCESS,
-            severity=NoticeSeverity.MEDIUM,
+            severity=NoticeSeverity.LOW,
             title=title,
             message=message,
             workflow_id=self.workflow_id,
             step_id=self.step_id,
-            **kwargs
-        ))
+            metadata=kwargs
+        )
+        await self.notice_manager.emit(notice)
     
     def get_context_value(self, key: str, default: Any = None) -> Any:
         """Get a value from the workflow context"""
@@ -153,163 +230,126 @@ class StepContext:
         self.workflow_context[key] = value
     
     def set_result(self, result: Any):
-        """Set the result of this step"""
-        self.step_result = result
+        """Set the result for this step"""
+        self._result = result
+    
+    def get_result(self) -> Any:
+        """Get the result for this step"""
+        return self._result
 
 class WorkflowEngine:
     def __init__(self, step_registry: StepRegistry, notice_manager: NoticeManager):
         self.step_registry = step_registry
         self.notice_manager = notice_manager
         self.workflows: Dict[str, WorkflowInstance] = {}
-        
-        # Initialize dependency resolver
-        self.dependency_resolver = DependencyResolver(step_registry.definitions)
-        step_registry.set_dependency_resolver(self.dependency_resolver)
     
     async def execute_workflow(self, workflow: WorkflowInstance):
-        workflow.status = WorkflowStatus.RUNNING
-        workflow.started_at = datetime.utcnow()
-        
+        """Execute a workflow with proper project isolation"""
         try:
-            await self.notice_manager.emit(Notice(
-                type=NoticeType.INFO,
-                severity=NoticeSeverity.LOW,
-                title="Workflow Started",
-                message=f"Starting workflow: {workflow.definition.name}",
-                workflow_id=workflow.id
-            ))
+            workflow.status = WorkflowStatus.RUNNING
+            workflow.started_at = datetime.utcnow()
             
-            # Validate workflow before execution
-            errors, warnings = self.step_registry.validate_workflow(workflow)
+            # Initialize workflow context
+            workflow.context = {}
             
-            if warnings:
-                for warning in warnings:
-                    await self.notice_manager.emit(Notice(
-                        type=NoticeType.WARNING,
-                        severity=NoticeSeverity.MEDIUM,
-                        title="Workflow Warning",
-                        message=warning,
-                        workflow_id=workflow.id
-                    ))
+            # Store workflow in the engine's workflow list
+            self.workflows[workflow.id] = workflow
             
-            if errors:
-                error_msg = "Workflow validation failed:\n" + "\n".join(errors)
-                await self.notice_manager.emit(Notice(
-                    type=NoticeType.ERROR,
-                    severity=NoticeSeverity.CRITICAL,
-                    title="Workflow Validation Failed",
-                    message=error_msg,
-                    workflow_id=workflow.id,
-                    dismissible=False
-                ))
-                raise ValueError(error_msg)
-            
-            # Resolve dependencies and get execution order
-            resolution = self.step_registry.resolve_dependencies(workflow)
-            
-            await self.notice_manager.emit(Notice(
-                type=NoticeType.INFO,
-                severity=NoticeSeverity.LOW,
-                title="Dependencies Resolved",
-                message=f"Execution order: {' -> '.join(resolution.execution_order)}",
-                workflow_id=workflow.id
-            ))
+            # Resolve dependencies
+            dependency_resolution = self.step_registry.resolve_dependencies(workflow)
             
             # Execute steps in dependency order
-            for step_id in resolution.execution_order:
+            for step_id in dependency_resolution.execution_order:
                 workflow.current_step = step_id
                 
-                # Find the step definition
-                step_def = None
-                for step in workflow.definition.steps:
-                    if step.step_id == step_id:
-                        step_def = step
-                        break
+                # Find the step in the workflow
+                step = next((s for s in workflow.definition.steps if s.step_id == step_id), None)
+                if not step:
+                    continue
                 
-                if not step_def:
-                    raise ValueError(f"Step {step_id} not found in workflow definition")
+                # Prepare step parameters with context values
+                params = self._prepare_step_params(step, workflow.context)
                 
-                context = StepContext(workflow.id, step_id, self.notice_manager, workflow.context)
+                # Create step context
+                context = StepContext(
+                    workflow_id=workflow.id,
+                    step_id=step_id,
+                    notice_manager=self.notice_manager,
+                    workflow_context=workflow.context
+                )
                 
                 try:
-                    await self.notice_manager.emit(Notice(
-                        type=NoticeType.INFO,
-                        severity=NoticeSeverity.LOW,
-                        title="Step Started",
-                        message=f"Executing step: {step_id}",
-                        workflow_id=workflow.id,
-                        step_id=step_id
-                    ))
-                    
                     # Execute the step
-                    result = await self.step_registry.execute(
-                        step_id, 
-                        step_def.params, 
-                        context
-                    )
+                    result = await self.step_registry.execute(step_id, params, context)
                     
-                    # Store the result
+                    # Store result
                     workflow.step_results[step_id] = result
                     
-                    # Add step outputs to context
-                    step_definition = self.step_registry.get_step_definition(step_id)
-                    if step_definition:
-                        for context_key in step_definition.io.context_keys:
-                            workflow.context[context_key] = result
-                    
-                    await self.notice_manager.emit(Notice(
-                        type=NoticeType.SUCCESS,
-                        severity=NoticeSeverity.LOW,
-                        title="Step Completed",
-                        message=f"Step {step_id} completed successfully",
-                        workflow_id=workflow.id,
-                        step_id=step_id,
-                        auto_dismiss_seconds=5
-                    ))
+                    # Update workflow context with step outputs
+                    self._update_workflow_context(workflow, step_id, result)
                     
                 except Exception as e:
-                    await self.notice_manager.emit(Notice(
-                        type=NoticeType.ERROR,
-                        severity=NoticeSeverity.CRITICAL,
-                        title="Step Failed",
-                        message=str(e),
-                        workflow_id=workflow.id,
-                        step_id=step_id,
-                        metadata={"traceback": traceback.format_exc()}
-                    ))
-                    raise
+                    await context.error("Step Failed", f"Step {step_id} failed: {str(e)}")
+                    workflow.status = WorkflowStatus.FAILED
+                    workflow.completed_at = datetime.utcnow()
+                    return
             
             workflow.status = WorkflowStatus.COMPLETED
             workflow.completed_at = datetime.utcnow()
             
-            await self.notice_manager.emit(Notice(
-                type=NoticeType.SUCCESS,
-                severity=NoticeSeverity.MEDIUM,
-                title="Workflow Completed",
-                message=f"Workflow {workflow.definition.name} completed successfully",
-                workflow_id=workflow.id,
-                auto_dismiss_seconds=10
-            ))
-            
         except Exception as e:
             workflow.status = WorkflowStatus.FAILED
             workflow.completed_at = datetime.utcnow()
-            
             await self.notice_manager.emit(Notice(
                 type=NoticeType.ERROR,
-                severity=NoticeSeverity.CRITICAL,
+                severity=NoticeSeverity.HIGH,
                 title="Workflow Failed",
-                message=str(e),
-                workflow_id=workflow.id,
-                dismissible=False
+                message=f"Workflow execution failed: {str(e)}",
+                workflow_id=workflow.id
             ))
+    
+    def _prepare_step_params(self, step: 'WorkflowStep', context: Dict[str, Any]) -> Dict[str, Any]:
+        """Prepare step parameters, filling in context values where needed"""
+        params = step.params.copy()
+        
+        # For project steps, handle special cases
+        if step.step_id == "create_project":
+            # Remove projects_root from user parameters for security
+            params.pop('projects_root', None)
+        elif step.step_id in ["upload_file_to_project", "download_project_zip", "validate_project_token", "list_project_files"]:
+            # Auto-fill project_token from context if not provided or empty
+            if not params.get('project_token') and 'project_token' in context:
+                params['project_token'] = context['project_token']
+        
+        # Fill in any other context values that match parameter names
+        for param_name in params.keys():
+            if param_name in context and not params.get(param_name):
+                params[param_name] = context[param_name]
+        
+        return params
+    
+    def _update_workflow_context(self, workflow: WorkflowInstance, step_id: str, result: Dict[str, Any]):
+        """Update workflow context with step results"""
+        step_def = self.step_registry.get_step_definition(step_id)
+        if not step_def:
+            return
+        
+        # Add context keys defined by the step
+        for context_key in step_def.io.context_keys:
+            if context_key in result:
+                workflow.context[context_key] = result[context_key]
+        
+        # Also add all outputs to context for convenience
+        for output_schema in step_def.io.outputs:
+            if output_schema.name in result:
+                workflow.context[output_schema.name] = result[output_schema.name]
     
     def get_workflow_dependencies(self, workflow_id: str) -> Optional[DependencyResolution]:
         """Get dependency resolution for a workflow"""
-        if workflow_id not in self.workflows:
+        workflow = self.workflows.get(workflow_id)
+        if not workflow:
             return None
         
-        workflow = self.workflows[workflow_id]
         return self.step_registry.resolve_dependencies(workflow)
 
 # Global instances

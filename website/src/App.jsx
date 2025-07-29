@@ -312,7 +312,23 @@ export default function App() {
   };
 
   const removeStep = (stepId) => {
-    setSelectedSteps(prev => prev.filter(s => s.step_id !== stepId));
+    setSelectedSteps(prev => prev.filter(step => step.step_id !== stepId));
+  };
+
+  // Simulate workflow context based on selected steps
+  const getWorkflowContext = () => {
+    const context = {};
+    
+    // Find create_project step and extract its outputs
+    const createProjectStep = selectedSteps.find(step => step.step_id === 'create_project');
+    if (createProjectStep) {
+      // Simulate the outputs that would be available after create_project runs
+      context.project_id = 'simulated-project-id';
+      context.project_path = '/projects/simulated-project-id';
+      context.project_token = 'simulated-project-token';
+    }
+    
+    return context;
   };
 
   const filteredSteps = () => {
@@ -497,6 +513,7 @@ export default function App() {
                       stepDefinition={steps[step.step_id]}
                       onUpdate={updateStepParams}
                       onRemove={removeStep}
+                      workflowContext={getWorkflowContext()}
                     />
                   ))}
                 </div>

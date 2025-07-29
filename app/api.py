@@ -1,11 +1,15 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Query, UploadFile, File
 from typing import List, Optional, Dict
 from datetime import datetime
 import asyncio
+import os
+import shutil
+from pathlib import Path
 
 from .models import Notice, NoticeType, WorkflowStatus, WorkflowDefinition, WorkflowInstance, StepDefinition, DependencyResolution
 from .core import notice_manager, step_registry, workflow_engine
 from .step_loader import StepLoader
+from .dependency_resolver import DependencyResolver
 
 # Create FastAPI app
 app = FastAPI(title="Scientific Workflow API")
@@ -22,6 +26,39 @@ app.add_middleware(
 
 # Initialize step loader
 step_loader = StepLoader()
+
+# Create uploads directory
+UPLOADS_DIR = Path("./uploads")
+UPLOADS_DIR.mkdir(exist_ok=True)
+
+# Initialize dependency resolver
+@app.on_event("startup")
+async def startup_event():
+    """Initialize the dependency resolver after steps are loaded"""
+    dependency_resolver = DependencyResolver(step_registry.definitions)
+    step_registry.set_dependency_resolver(dependency_resolver)
+
+@app.post("/upload-file")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload a file and return the file path"""
+    try:
+        # Create a unique filename to avoid conflicts
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        filename = f"{timestamp}_{file.filename}"
+        file_path = UPLOADS_DIR / filename
+        
+        # Save the uploaded file
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        return {
+            "success": True,
+            "file_path": str(file_path),
+            "filename": file.filename,
+            "size": file_path.stat().st_size
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
 # API Endpoints
 @app.get("/notices", response_model=List[Notice])
