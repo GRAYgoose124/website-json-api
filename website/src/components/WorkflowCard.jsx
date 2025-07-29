@@ -19,10 +19,31 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating, dependen
     cancelled: <X className="w-3 h-3" />
   };
 
+  const isStepFailed = (stepId) => {
+    const result = workflow.step_results[stepId];
+    if (!result) return false;
+    
+    // Check for common failure indicators in step results
+    if (result.upload_status && result.upload_status.startsWith('failed')) {
+      return true;
+    }
+    
+    // Check for other status fields that might indicate failure
+    for (const [key, value] of Object.entries(result)) {
+      if (key.endsWith('_status') && typeof value === 'string' && value.startsWith('failed')) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   const totalSteps = workflow.definition.steps.length;
   const completedSteps = workflow.status === 'completed' ? totalSteps : 
-                        workflow.status === 'failed' ? 0 : 
-                        workflow.current_step ? workflow.definition.steps.findIndex(s => s.step_id === workflow.current_step) : 0;
+                        Object.keys(workflow.step_results || {}).length;
+  const failedSteps = workflow.definition.steps.filter(step => 
+    workflow.step_results[step.step_id] && isStepFailed(step.step_id)
+  ).length;
   const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
 
   // Get execution order from dependencies
@@ -53,7 +74,7 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating, dependen
         <div className="mb-2">
           <div className="flex justify-between text-xs text-gray-400 mb-1">
             <span>Progress</span>
-            <span>{completedSteps}/{totalSteps} steps</span>
+            <span>{completedSteps}/{totalSteps} steps{failedSteps > 0 && ` (${failedSteps} failed)`}</span>
           </div>
           <div className="w-full bg-gray-700/50 rounded-full h-1.5 overflow-hidden">
             <div 

@@ -22,11 +22,56 @@ const WorkflowChain = ({ workflow, isActive, dependencies }) => {
     return emojiMap[stepId] || '⚡';
   };
 
+  const isStepFailed = (stepId) => {
+    const result = workflow.step_results[stepId];
+    if (!result) return false;
+    
+    // Check for common failure indicators in step results
+    if (result.upload_status && result.upload_status.startsWith('failed')) {
+      return true;
+    }
+    
+    // Check for other status fields that might indicate failure
+    for (const [key, value] of Object.entries(result)) {
+      if (key.endsWith('_status') && typeof value === 'string' && value.startsWith('failed')) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   const getStepStatus = (stepId) => {
-    if (workflow.status === 'completed') return 'completed';
-    if (workflow.status === 'failed') return 'failed';
-    if (workflow.current_step === stepId) return 'running';
-    if (workflow.step_results[stepId]) return 'completed';
+    // If workflow is completed, check if individual steps failed
+    if (workflow.status === 'completed') {
+      if (isStepFailed(stepId)) return 'failed';
+      return 'completed';
+    }
+    
+    // If workflow is running, check current step and completed steps
+    if (workflow.status === 'running') {
+      if (workflow.current_step === stepId) return 'running';
+      if (workflow.step_results[stepId]) {
+        if (isStepFailed(stepId)) return 'failed';
+        return 'completed';
+      }
+      return 'pending';
+    }
+    
+    // If workflow failed, check individual step results
+    if (workflow.status === 'failed') {
+      // If this step has a result, check if it failed
+      if (workflow.step_results[stepId]) {
+        if (isStepFailed(stepId)) return 'failed';
+        return 'completed';
+      }
+      // If this is the current step when workflow failed, it failed
+      if (workflow.current_step === stepId) return 'failed';
+      // Otherwise, it was never reached (pending)
+      return 'pending';
+    }
+    
+    // Default case: pending
     return 'pending';
   };
 

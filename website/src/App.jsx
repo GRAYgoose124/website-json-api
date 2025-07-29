@@ -16,7 +16,7 @@ import ConnectionStatus from './components/ConnectionStatus';
 import LoadingSpinner from './components/LoadingSpinner';
 import StepDependencies from './components/StepDependencies';
 
-const API_BASE = 'http://localhost:8001';
+const API_BASE = 'http://localhost:8002';
 
 // Main App Component
 export default function App() {
@@ -188,7 +188,7 @@ export default function App() {
 
   const connectWebSocket = () => {
     try {
-      wsRef.current = new WebSocket(`ws://localhost:8001/ws/notices`);
+      wsRef.current = new WebSocket(`ws://localhost:8002/ws/notices`);
       
       wsRef.current.onopen = () => {
         console.log('WebSocket connected');
@@ -278,9 +278,9 @@ export default function App() {
       if (res.ok) {
         const workflowsData = await res.json();
         
-        // Find workflows that have completed and contain download results
+        // Find workflows that have completed or failed and contain download results
         for (const workflow of workflowsData) {
-          if (workflow.status === 'completed' && workflow.step_results) {
+          if ((workflow.status === 'completed' || workflow.status === 'failed') && workflow.step_results) {
             for (const [stepId, result] of Object.entries(workflow.step_results)) {
               if (stepId === 'download_project_zip' && result.download_url && result.download_filename) {
                 console.log(`Found download result in workflow ${workflow.id}: ${result.download_filename}`);
@@ -367,6 +367,26 @@ export default function App() {
 
   const removeStep = (stepId) => {
     setSelectedSteps(prev => prev.filter(step => step.step_id !== stepId));
+  };
+
+  // Utility function to check if a step failed
+  const isStepFailed = (stepId, workflow) => {
+    const result = workflow?.step_results?.[stepId];
+    if (!result) return false;
+    
+    // Check for common failure indicators in step results
+    if (result.upload_status && result.upload_status.startsWith('failed')) {
+      return true;
+    }
+    
+    // Check for other status fields that might indicate failure
+    for (const [key, value] of Object.entries(result)) {
+      if (key.endsWith('_status') && typeof value === 'string' && value.startsWith('failed')) {
+        return true;
+      }
+    }
+    
+    return false;
   };
 
   // Simulate workflow context based on selected steps
@@ -694,8 +714,8 @@ export default function App() {
                     <p className="text-gray-400 text-xs">System notices will appear here</p>
                   </div>
                 ) : (
-                  notices.map(notice => (
-                    <Notice key={`tab-${notice.id}`} notice={notice} onDismiss={dismissNotice} />
+                  notices.map((notice, index) => (
+                    <Notice key={`tab-${notice.id}-${index}`} notice={notice} onDismiss={dismissNotice} />
                   ))
                 )}
               </div>
@@ -705,9 +725,9 @@ export default function App() {
 
         {/* Notices */}
         <div className="fixed bottom-4 right-4 space-y-2 z-50 max-w-sm">
-          {notices.slice(0, 3).map(notice => (
+          {notices.slice(0, 3).map((notice, index) => (
             <Notice
-              key={`fixed-${notice.id}`}
+              key={`fixed-${notice.id}-${index}`}
               notice={notice}
               onDismiss={() => dismissNotice(notice.id)}
             />

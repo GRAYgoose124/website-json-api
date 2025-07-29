@@ -21,7 +21,7 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove, workflowC
       const formData = new FormData();
       formData.append('file', file);
       
-      const response = await fetch('http://localhost:8001/upload-file', {
+      const response = await fetch('http://localhost:8002/upload-file', {
         method: 'POST',
         body: formData,
       });

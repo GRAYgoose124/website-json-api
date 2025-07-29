@@ -54,6 +54,13 @@ class WorkflowEngine:
                     # Store result
                     workflow.step_results[step_id] = result
                     
+                    # Check if step failed (look for failure indicators in the result)
+                    if self._is_step_failed(result):
+                        await context.error("Step Failed", f"Step {step_id} failed: {self._get_step_failure_message(result)}")
+                        workflow.status = WorkflowStatus.FAILED
+                        workflow.completed_at = datetime.now(UTC)
+                        return
+                    
                     # Update workflow context with step outputs
                     self._update_workflow_context(workflow, step_id, result)
                     
@@ -112,6 +119,40 @@ class WorkflowEngine:
         for output_schema in step_def.io.outputs:
             if output_schema.name in result:
                 workflow.context[output_schema.name] = result[output_schema.name]
+    
+    def _is_step_failed(self, result: Dict[str, Any]) -> bool:
+        """Check if a step result indicates failure"""
+        # Check for common failure indicators in step results
+        if not result:
+            return True
+        
+        # Check for upload_status failure
+        if 'upload_status' in result and result['upload_status'].startswith('failed'):
+            return True
+        
+        # Check for other status fields that might indicate failure
+        for key, value in result.items():
+            if key.endswith('_status') and isinstance(value, str) and value.startswith('failed'):
+                return True
+        
+        return False
+    
+    def _get_step_failure_message(self, result: Dict[str, Any]) -> str:
+        """Extract failure message from step result"""
+        if not result:
+            return "Step returned no result"
+        
+        # Check for upload_status failure message
+        if 'upload_status' in result and result['upload_status'].startswith('failed'):
+            return result['upload_status']
+        
+        # Check for other status fields
+        for key, value in result.items():
+            if key.endswith('_status') and isinstance(value, str) and value.startswith('failed'):
+                return value
+        
+        # Fallback
+        return "Step failed with unknown error"
     
     def get_workflow_dependencies(self, workflow_id: str) -> Optional[DependencyResolution]:
         """Get dependency resolution for a workflow"""

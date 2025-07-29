@@ -60,6 +60,15 @@ async def upload_file_to_project(params: Dict[str, Any], context: StepContext):
     
     await context.info("Token Validated", f"Accessing project: {project_info['project_name']}")
     
+    # Check if file_path is provided
+    if not file_path:
+        await context.error("No File Path", "No file path provided for upload")
+        return {
+            'uploaded_file_path': '',
+            'file_size': 0,
+            'upload_status': 'failed - no file path provided'
+        }
+    
     # Check if source file exists
     if not os.path.exists(file_path):
         await context.error("File Not Found", f"Source file not found: {file_path}")

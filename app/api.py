@@ -29,8 +29,9 @@ app.add_middleware(
 async def upload_file(file: UploadFile = File(...)):
     """Upload a file and return the file path"""
     try:
-        # Get uploads directory from app state
-        uploads_dir = getattr(app.state, 'uploads_dir', Path("./uploads"))
+        # Get uploads directory from app state and ensure it's a Path object
+        uploads_dir_raw = getattr(app.state, 'uploads_dir', "./uploads")
+        uploads_dir = Path(uploads_dir_raw) if isinstance(uploads_dir_raw, str) else uploads_dir_raw
         uploads_dir.mkdir(exist_ok=True)
         
         # Create a unique filename to avoid conflicts
@@ -56,8 +57,11 @@ async def download_file(file_path: str):
     """Download a file from the server"""
     try:
         # Security: Only allow downloads from specific directories
+        uploads_dir_raw = getattr(app.state, 'uploads_dir', "./uploads")
+        uploads_dir = Path(uploads_dir_raw) if isinstance(uploads_dir_raw, str) else uploads_dir_raw
+        
         allowed_dirs = [
-            getattr(app.state, 'uploads_dir', Path("./uploads")),
+            uploads_dir,
             Path("./userdata/projects/downloads"),
             Path("./test-userdata/projects/downloads")
         ]

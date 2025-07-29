@@ -6,11 +6,56 @@ import WorkflowChain from './WorkflowChain';
 const WorkflowDetails = ({ workflow, onClose }) => {
   if (!workflow) return null;
 
+  const isStepFailed = (stepId) => {
+    const result = workflow.step_results[stepId];
+    if (!result) return false;
+    
+    // Check for common failure indicators in step results
+    if (result.upload_status && result.upload_status.startsWith('failed')) {
+      return true;
+    }
+    
+    // Check for other status fields that might indicate failure
+    for (const [key, value] of Object.entries(result)) {
+      if (key.endsWith('_status') && typeof value === 'string' && value.startsWith('failed')) {
+        return true;
+      }
+    }
+    
+    return false;
+  };
+
   const getStepStatus = (stepId) => {
-    if (workflow.status === 'completed') return 'completed';
-    if (workflow.status === 'failed') return 'failed';
-    if (workflow.current_step === stepId) return 'running';
-    if (workflow.step_results[stepId]) return 'completed';
+    // If workflow is completed, check if individual steps failed
+    if (workflow.status === 'completed') {
+      if (isStepFailed(stepId)) return 'failed';
+      return 'completed';
+    }
+    
+    // If workflow is running, check current step and completed steps
+    if (workflow.status === 'running') {
+      if (workflow.current_step === stepId) return 'running';
+      if (workflow.step_results[stepId]) {
+        if (isStepFailed(stepId)) return 'failed';
+        return 'completed';
+      }
+      return 'pending';
+    }
+    
+    // If workflow failed, check individual step results
+    if (workflow.status === 'failed') {
+      // If this step has a result, check if it failed
+      if (workflow.step_results[stepId]) {
+        if (isStepFailed(stepId)) return 'failed';
+        return 'completed';
+      }
+      // If this is the current step when workflow failed, it failed
+      if (workflow.current_step === stepId) return 'failed';
+      // Otherwise, it was never reached (pending)
+      return 'pending';
+    }
+    
+    // Default case: pending
     return 'pending';
   };
 
@@ -111,9 +156,19 @@ const WorkflowDetails = ({ workflow, onClose }) => {
                 </div>
                 
                 {stepResult && (
-                  <div className="mt-3 p-3 bg-green-600/20 border border-green-500/30 rounded-lg">
-                    <h5 className="text-sm font-medium text-green-400 mb-2">Step Result</h5>
-                    <pre className="text-xs text-green-300 overflow-x-auto bg-gray-900 p-2 rounded border border-gray-600">
+                  <div className={`mt-3 p-3 rounded-lg border ${
+                    isStepFailed(step.step_id) 
+                      ? 'bg-red-600/20 border-red-500/30' 
+                      : 'bg-green-600/20 border-green-500/30'
+                  }`}>
+                    <h5 className={`text-sm font-medium mb-2 ${
+                      isStepFailed(step.step_id) ? 'text-red-400' : 'text-green-400'
+                    }`}>
+                      {isStepFailed(step.step_id) ? 'Step Failed' : 'Step Result'}
+                    </h5>
+                    <pre className={`text-xs overflow-x-auto bg-gray-900 p-2 rounded border border-gray-600 ${
+                      isStepFailed(step.step_id) ? 'text-red-300' : 'text-green-300'
+                    }`}>
                       {JSON.stringify(stepResult, null, 2)}
                     </pre>
                   </div>
