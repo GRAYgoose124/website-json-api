@@ -246,7 +246,7 @@ class WorkflowEngine:
                             raise
             
             workflow.status = WorkflowStatus.COMPLETED
-            workflow.completed_at = str(datetime.now(datetime.timezone.utc))
+            workflow.completed_at = datetime.utcnow()
             
             await self.notice_manager.emit(Notice(
                 type=NoticeType.SUCCESS,
@@ -766,15 +766,25 @@ async def dismiss_notice(notice_id: str):
     return {"status": "dismissed"}
 
 # WebSocket endpoint for real-time notices
-import json
-
 @app.websocket("/ws/notices")
 async def websocket_notices(websocket: WebSocket):
     await websocket.accept()
+    connection_closed = False
     
     async def send_notice(notice: Notice):
+        if connection_closed:
+            return
         try:
-            await websocket.send_json(notice.dict())
+            # Convert notice to dict and handle datetime serialization
+            notice_dict = notice.dict()
+            # Convert datetime to ISO string - handle naive datetime
+            if notice_dict.get('timestamp'):
+                timestamp = notice_dict['timestamp']
+                if hasattr(timestamp, 'isoformat'):
+                    notice_dict['timestamp'] = timestamp.isoformat()
+                else:
+                    notice_dict['timestamp'] = str(timestamp)
+            await websocket.send_json(notice_dict)
         except Exception as e:
             # Remove subscriber if connection is broken
             notice_manager.unsubscribe(send_notice)
@@ -784,18 +794,21 @@ async def websocket_notices(websocket: WebSocket):
     
     try:
         # Keep connection alive and handle disconnection
-        while True:
+        while not connection_closed:
             try:
                 # Send ping to keep connection alive
                 await websocket.send_json({"type": "ping", "timestamp": datetime.utcnow().isoformat()})
                 await asyncio.sleep(30)  # Ping every 30 seconds
             except WebSocketDisconnect:
+                connection_closed = True
                 break
             except Exception as e:
                 print(f"WebSocket error: {e}")
+                connection_closed = True
                 break
     except Exception as e:
         print(f"WebSocket connection error: {e}")
+        connection_closed = True
     finally:
         # Clean up subscriber when connection closes
         notice_manager.unsubscribe(send_notice)
