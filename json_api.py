@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any, Callable, Union
 from enum import Enum
@@ -246,7 +246,7 @@ class WorkflowEngine:
                             raise
             
             workflow.status = WorkflowStatus.COMPLETED
-            workflow.completed_at = datetime.utcnow()
+            workflow.completed_at = str(datetime.now(datetime.timezone.utc))
             
             await self.notice_manager.emit(Notice(
                 type=NoticeType.SUCCESS,
@@ -280,7 +280,7 @@ app = FastAPI(title="Scientific Workflow API")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "ws://localhost:5173", "ws://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -294,9 +294,35 @@ app.add_middleware(
     params_schema={
         "type": "object",
         "properties": {
-            "data_path": {"type": "string"},
-            "schema": {"type": "object"}
-        }
+            "data_path": {
+                "type": "string",
+                "title": "Data Path",
+                "description": "Path to the data file to validate",
+                "default": "/data/input.csv"
+            },
+            "validation_type": {
+                "type": "string",
+                "title": "Validation Type",
+                "description": "Type of validation to perform",
+                "enum": ["schema", "format", "completeness", "all"],
+                "default": "all"
+            },
+            "strict_mode": {
+                "type": "boolean",
+                "title": "Strict Mode",
+                "description": "Enable strict validation rules",
+                "default": False
+            },
+            "max_errors": {
+                "type": "integer",
+                "title": "Max Errors",
+                "description": "Maximum number of errors to report",
+                "minimum": 1,
+                "maximum": 1000,
+                "default": 100
+            }
+        },
+        "required": ["data_path"]
     }
 ))
 async def validate_data(params: Dict[str, Any], context: StepContext):
@@ -315,9 +341,36 @@ async def validate_data(params: Dict[str, Any], context: StepContext):
     params_schema={
         "type": "object",
         "properties": {
-            "algorithm": {"type": "string"},
-            "parameters": {"type": "object"}
-        }
+            "algorithm": {
+                "type": "string",
+                "title": "Processing Algorithm",
+                "description": "Algorithm to use for data processing",
+                "enum": ["standard", "advanced", "ml_optimized", "custom"],
+                "default": "standard"
+            },
+            "batch_size": {
+                "type": "integer",
+                "title": "Batch Size",
+                "description": "Number of records to process in each batch",
+                "minimum": 100,
+                "maximum": 10000,
+                "default": 1000
+            },
+            "parallel_processing": {
+                "type": "boolean",
+                "title": "Parallel Processing",
+                "description": "Enable parallel processing for faster execution",
+                "default": True
+            },
+            "output_format": {
+                "type": "string",
+                "title": "Output Format",
+                "description": "Format for processed data output",
+                "enum": ["csv", "json", "parquet", "hdf5"],
+                "default": "csv"
+            }
+        },
+        "required": ["algorithm"]
     }
 ))
 async def process_data(params: Dict[str, Any], context: StepContext):
@@ -336,9 +389,45 @@ async def process_data(params: Dict[str, Any], context: StepContext):
     params_schema={
         "type": "object",
         "properties": {
-            "model_type": {"type": "string"},
-            "hyperparameters": {"type": "object"}
-        }
+            "model_type": {
+                "type": "string",
+                "title": "Model Type",
+                "description": "Type of machine learning model to train",
+                "enum": ["neural_network", "random_forest", "svm", "linear_regression", "xgboost"],
+                "default": "neural_network"
+            },
+            "epochs": {
+                "type": "integer",
+                "title": "Training Epochs",
+                "description": "Number of training epochs",
+                "minimum": 1,
+                "maximum": 1000,
+                "default": 100
+            },
+            "learning_rate": {
+                "type": "number",
+                "title": "Learning Rate",
+                "description": "Learning rate for training",
+                "minimum": 0.0001,
+                "maximum": 1.0,
+                "default": 0.001
+            },
+            "validation_split": {
+                "type": "number",
+                "title": "Validation Split",
+                "description": "Fraction of data to use for validation",
+                "minimum": 0.1,
+                "maximum": 0.5,
+                "default": 0.2
+            },
+            "early_stopping": {
+                "type": "boolean",
+                "title": "Early Stopping",
+                "description": "Enable early stopping to prevent overfitting",
+                "default": True
+            }
+        },
+        "required": ["model_type"]
     }
 ))
 async def train_model(params: Dict[str, Any], context: StepContext):
@@ -360,9 +449,36 @@ async def train_model(params: Dict[str, Any], context: StepContext):
     params_schema={
         "type": "object",
         "properties": {
-            "analysis_type": {"type": "string"},
-            "output_format": {"type": "string"}
-        }
+            "analysis_type": {
+                "type": "string",
+                "title": "Analysis Type",
+                "description": "Type of analysis to perform",
+                "enum": ["comprehensive", "performance", "feature_importance", "error_analysis", "custom"],
+                "default": "comprehensive"
+            },
+            "output_format": {
+                "type": "string",
+                "title": "Output Format",
+                "description": "Format for analysis reports",
+                "enum": ["pdf", "html", "markdown", "json"],
+                "default": "pdf"
+            },
+            "include_visualizations": {
+                "type": "boolean",
+                "title": "Include Visualizations",
+                "description": "Generate charts and graphs in the report",
+                "default": True
+            },
+            "confidence_level": {
+                "type": "number",
+                "title": "Confidence Level",
+                "description": "Confidence level for statistical analysis",
+                "minimum": 0.8,
+                "maximum": 0.99,
+                "default": 0.95
+            }
+        },
+        "required": ["analysis_type"]
     }
 ))
 async def analyze_results(params: Dict[str, Any], context: StepContext):
@@ -384,9 +500,42 @@ async def analyze_results(params: Dict[str, Any], context: StepContext):
     params_schema={
         "type": "object",
         "properties": {
-            "cleaning_method": {"type": "string"},
-            "remove_duplicates": {"type": "boolean"}
-        }
+            "cleaning_method": {
+                "type": "string",
+                "title": "Cleaning Method",
+                "description": "Method to use for data cleaning",
+                "enum": ["standard", "aggressive", "conservative", "custom"],
+                "default": "standard"
+            },
+            "remove_duplicates": {
+                "type": "boolean",
+                "title": "Remove Duplicates",
+                "description": "Remove duplicate records from the dataset",
+                "default": True
+            },
+            "handle_missing": {
+                "type": "string",
+                "title": "Handle Missing Values",
+                "description": "Strategy for handling missing values",
+                "enum": ["drop", "impute_mean", "impute_median", "forward_fill"],
+                "default": "impute_mean"
+            },
+            "outlier_threshold": {
+                "type": "number",
+                "title": "Outlier Threshold",
+                "description": "Threshold for outlier detection (standard deviations)",
+                "minimum": 1.0,
+                "maximum": 5.0,
+                "default": 3.0
+            },
+            "normalize_data": {
+                "type": "boolean",
+                "title": "Normalize Data",
+                "description": "Apply data normalization",
+                "default": True
+            }
+        },
+        "required": ["cleaning_method"]
     }
 ))
 async def clean_data(params: Dict[str, Any], context: StepContext):
@@ -408,9 +557,44 @@ async def clean_data(params: Dict[str, Any], context: StepContext):
     params_schema={
         "type": "object",
         "properties": {
-            "feature_selection": {"type": "string"},
-            "create_interactions": {"type": "boolean"}
-        }
+            "feature_selection": {
+                "type": "string",
+                "title": "Feature Selection Method",
+                "description": "Method for feature selection",
+                "enum": ["correlation", "mutual_info", "lasso", "recursive", "all"],
+                "default": "correlation"
+            },
+            "create_interactions": {
+                "type": "boolean",
+                "title": "Create Interactions",
+                "description": "Create interaction features between variables",
+                "default": True
+            },
+            "polynomial_features": {
+                "type": "integer",
+                "title": "Polynomial Degree",
+                "description": "Degree of polynomial features to create",
+                "minimum": 1,
+                "maximum": 3,
+                "default": 2
+            },
+            "feature_scaling": {
+                "type": "string",
+                "title": "Feature Scaling",
+                "description": "Method for feature scaling",
+                "enum": ["standard", "minmax", "robust", "none"],
+                "default": "standard"
+            },
+            "max_features": {
+                "type": "integer",
+                "title": "Max Features",
+                "description": "Maximum number of features to select",
+                "minimum": 5,
+                "maximum": 100,
+                "default": 20
+            }
+        },
+        "required": ["feature_selection"]
     }
 ))
 async def engineer_features(params: Dict[str, Any], context: StepContext):
@@ -432,9 +616,46 @@ async def engineer_features(params: Dict[str, Any], context: StepContext):
     params_schema={
         "type": "object",
         "properties": {
-            "metrics": {"type": "array"},
-            "cross_validation": {"type": "boolean"}
-        }
+            "metrics": {
+                "type": "array",
+                "title": "Evaluation Metrics",
+                "description": "Metrics to use for model evaluation",
+                "items": {
+                    "type": "string",
+                    "enum": ["accuracy", "precision", "recall", "f1", "auc", "mae", "rmse"]
+                },
+                "default": ["accuracy", "precision", "recall", "f1"]
+            },
+            "cross_validation": {
+                "type": "boolean",
+                "title": "Cross Validation",
+                "description": "Use cross-validation for evaluation",
+                "default": True
+            },
+            "cv_folds": {
+                "type": "integer",
+                "title": "Cross Validation Folds",
+                "description": "Number of folds for cross-validation",
+                "minimum": 3,
+                "maximum": 10,
+                "default": 5
+            },
+            "test_size": {
+                "type": "number",
+                "title": "Test Set Size",
+                "description": "Fraction of data to use for testing",
+                "minimum": 0.1,
+                "maximum": 0.5,
+                "default": 0.2
+            },
+            "stratified_sampling": {
+                "type": "boolean",
+                "title": "Stratified Sampling",
+                "description": "Use stratified sampling for test set",
+                "default": True
+            }
+        },
+        "required": ["metrics"]
     }
 ))
 async def evaluate_model(params: Dict[str, Any], context: StepContext):
@@ -456,9 +677,40 @@ async def evaluate_model(params: Dict[str, Any], context: StepContext):
     params_schema={
         "type": "object",
         "properties": {
-            "deployment_type": {"type": "string"},
-            "api_format": {"type": "string"}
-        }
+            "deployment_type": {
+                "type": "string",
+                "title": "Deployment Type",
+                "description": "Type of deployment to prepare",
+                "enum": ["rest_api", "batch_processing", "streaming", "edge", "cloud"],
+                "default": "rest_api"
+            },
+            "api_format": {
+                "type": "string",
+                "title": "API Format",
+                "description": "Format for the API interface",
+                "enum": ["json", "protobuf", "graphql", "grpc"],
+                "default": "json"
+            },
+            "containerization": {
+                "type": "boolean",
+                "title": "Containerization",
+                "description": "Create Docker container for deployment",
+                "default": True
+            },
+            "health_checks": {
+                "type": "boolean",
+                "title": "Health Checks",
+                "description": "Include health check endpoints",
+                "default": True
+            },
+            "monitoring": {
+                "type": "boolean",
+                "title": "Monitoring",
+                "description": "Include monitoring and logging",
+                "default": True
+            }
+        },
+        "required": ["deployment_type"]
     }
 ))
 async def prepare_deployment(params: Dict[str, Any], context: StepContext):
@@ -514,7 +766,6 @@ async def dismiss_notice(notice_id: str):
     return {"status": "dismissed"}
 
 # WebSocket endpoint for real-time notices
-from fastapi import WebSocket, WebSocketDisconnect
 import json
 
 @app.websocket("/ws/notices")

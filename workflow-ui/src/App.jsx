@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   AlertCircle, CheckCircle, Info, AlertTriangle, X, Activity, Play, Clock, Zap, 
   RefreshCw, Settings, BarChart3, Plus, ChevronRight, ChevronDown, Loader2,
-  Calendar, Timer, User, Database, Cpu, Target, TrendingUp, Shield, Rocket, Search as SearchIcon
+  Calendar, Timer, User, Database, Cpu, Target, TrendingUp, Shield, Rocket, Search as SearchIcon,
+  Edit3, Save, Trash2, Eye, EyeOff, ChevronUp
 } from 'lucide-react';
 
 const API_BASE = 'http://localhost:8001';
@@ -122,18 +123,18 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
   };
 
   return (
-    <div className={`rounded-xl border transition-all duration-300 backdrop-blur-sm ${
+    <div className={`rounded-2xl border transition-all duration-300 backdrop-blur-sm ${
       isSelected 
         ? 'bg-gradient-to-br from-blue-800/30 to-blue-900/30 border-blue-500/50 shadow-xl shadow-blue-500/20' 
         : 'bg-gradient-to-br from-gray-800/50 to-gray-900/50 border-gray-700/50 hover:border-gray-600 hover:shadow-xl hover:shadow-black/20'
     } ${workflow.status === 'running' && isAutoUpdating ? 'ring-1 ring-blue-500/30 animate-pulse' : ''}`}>
       <div className="p-6">
-        <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start justify-between mb-6">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-lg truncate">{workflow.definition.name}</h3>
-            <p className="text-sm text-gray-400 mt-1 line-clamp-2">{workflow.definition.description}</p>
+            <h3 className="font-semibold text-xl truncate mb-2">{workflow.definition.name}</h3>
+            <p className="text-sm text-gray-400 line-clamp-2">{workflow.definition.description}</p>
           </div>
-          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${statusColors[workflow.status]}`}>
+          <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${statusColors[workflow.status]}`}>
             {statusIcons[workflow.status]}
             <span className="capitalize">{workflow.status}</span>
             {workflow.status === 'running' && isAutoUpdating && (
@@ -143,12 +144,12 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
         </div>
 
         {/* Progress Bar */}
-        <div className="mb-4">
-          <div className="flex justify-between text-xs text-gray-400 mb-2">
+        <div className="mb-6">
+          <div className="flex justify-between text-sm text-gray-400 mb-3">
             <span>Progress</span>
             <span>{completedSteps}/{totalSteps} steps</span>
           </div>
-          <div className="w-full bg-gray-700/50 rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-gray-700/50 rounded-full h-3 overflow-hidden">
             <div 
               className={`h-full transition-all duration-500 ease-out ${
                 workflow.status === 'completed' ? 'bg-green-500' :
@@ -161,22 +162,22 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
         </div>
 
         {/* Workflow Details */}
-        <div className="flex items-center justify-between text-xs text-gray-500 mb-4">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <Calendar className="w-3 h-3" />
+        <div className="flex items-center justify-between text-sm text-gray-500 mb-6">
+          <div className="flex items-center gap-6">
+            <span className="flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
               {new Date(workflow.created_at).toLocaleDateString()}
             </span>
             {duration && (
-              <span className="flex items-center gap-1">
-                <Timer className="w-3 h-3" />
+              <span className="flex items-center gap-2">
+                <Timer className="w-4 h-4" />
                 {(duration / 1000).toFixed(1)}s
               </span>
             )}
           </div>
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-1 hover:text-gray-300 transition-colors"
+            className="flex items-center gap-2 hover:text-gray-300 transition-colors"
           >
             {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             Details
@@ -185,22 +186,24 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
 
         {/* Current Step Indicator */}
         {workflow.current_step && workflow.status === 'running' && (
-          <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-            <div className="flex items-center gap-2 text-blue-400">
-              <Activity className="w-4 h-4 animate-spin" />
-              <span className="text-sm font-medium">Current Step:</span>
-              <span className="text-sm">{workflow.current_step}</span>
+          <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+            <div className="flex items-center gap-3 text-blue-400">
+              <Activity className="w-5 h-5 animate-spin" />
+              <div>
+                <span className="text-sm font-medium">Current Step:</span>
+                <span className="text-sm ml-2">{workflow.current_step.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+              </div>
             </div>
           </div>
         )}
 
         {/* Expanded Details */}
         {isExpanded && (
-          <div className="mt-4 pt-4 border-t border-gray-700/50">
-            <h4 className="text-sm font-medium text-gray-300 mb-3">Workflow Steps</h4>
-            <div className="space-y-2">
+          <div className="mt-6 pt-6 border-t border-gray-700/50">
+            <h4 className="text-sm font-medium text-gray-300 mb-4">Workflow Steps</h4>
+            <div className="space-y-3">
               {workflow.definition.steps.map((step, index) => (
-                <div key={step.step_id} className="flex items-center gap-3 p-2 rounded-lg bg-gray-800/30">
+                <div key={step.step_id} className="flex items-center gap-4 p-3 rounded-xl bg-gray-800/30">
                   <div className="flex-shrink-0">
                     {getStepIcon(step.step_id)}
                   </div>
@@ -218,10 +221,10 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-2 mt-4">
+        <div className="flex gap-3 mt-6">
           <button
             onClick={() => onSelect(workflow)}
-            className="flex-1 py-2 px-4 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 transition-all duration-300 font-medium text-sm shadow-lg"
+            className="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 transition-all duration-300 font-medium text-sm shadow-lg"
           >
             View Details
           </button>
@@ -234,6 +237,7 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
 // Enhanced Step Selector
 const StepSelector = ({ steps, selectedSteps, onStepToggle }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isExpanded, setIsExpanded] = useState(true);
   
   const filteredSteps = Object.entries(steps).filter(([id, step]) =>
     step.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -256,47 +260,64 @@ const StepSelector = ({ steps, selectedSteps, onStepToggle }) => {
 
   return (
     <div className="space-y-4">
-      <div className="relative">
-        <input
-          type="text"
-          placeholder="Search steps..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-2 pl-10 rounded-lg bg-gray-900/50 border border-gray-700 focus:border-blue-500 focus:outline-none transition-colors text-sm"
-        />
-        <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+      <div className="flex items-center justify-between">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            placeholder="Search steps..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-3 pl-10 rounded-xl bg-gray-900/50 border border-gray-700 focus:border-blue-500 focus:outline-none transition-colors text-sm"
+          />
+          <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        </div>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="ml-3 p-2 rounded-lg hover:bg-gray-700/50 transition-colors"
+        >
+          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
       </div>
       
-      <div className="space-y-2 max-h-64 overflow-y-auto">
-        {filteredSteps.map(([id, step]) => (
-          <div
-            key={id}
-            className={`p-4 rounded-lg border transition-all cursor-pointer ${
-              selectedSteps.find(s => s.step_id === id)
-                ? 'bg-blue-500/20 border-blue-500/50 shadow-lg shadow-blue-500/20'
-                : 'bg-gray-800/30 border-gray-700/50 hover:border-gray-600 hover:bg-gray-800/50'
-            }`}
-            onClick={() => onStepToggle(id)}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`flex-shrink-0 ${selectedSteps.find(s => s.step_id === id) ? 'text-blue-400' : 'text-gray-400'}`}>
-                {getStepIcon(id)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h4 className="font-medium text-sm">{step.name}</h4>
-                <p className="text-xs text-gray-400 mt-1 line-clamp-2">{step.description}</p>
-              </div>
-              <div className={`flex-shrink-0 transition-colors ${selectedSteps.find(s => s.step_id === id) ? 'text-blue-400' : 'text-gray-600'}`}>
-                {selectedSteps.find(s => s.step_id === id) ? (
-                  <CheckCircle className="w-5 h-5" />
-                ) : (
-                  <Plus className="w-5 h-5" />
-                )}
-              </div>
+      {isExpanded && (
+        <div className="space-y-2 max-h-64 overflow-y-auto bg-gray-900/30 rounded-xl p-3 border border-gray-700/50">
+          {filteredSteps.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <SearchIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No steps found</p>
             </div>
-          </div>
-        ))}
-      </div>
+          ) : (
+            filteredSteps.map(([id, step]) => (
+              <div
+                key={id}
+                className={`p-4 rounded-xl border transition-all cursor-pointer ${
+                  selectedSteps.find(s => s.step_id === id)
+                    ? 'bg-blue-500/20 border-blue-500/50 shadow-lg shadow-blue-500/20'
+                    : 'bg-gray-800/30 border-gray-700/50 hover:border-gray-600 hover:bg-gray-800/50'
+                }`}
+                onClick={() => onStepToggle(id)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`flex-shrink-0 ${selectedSteps.find(s => s.step_id === id) ? 'text-blue-400' : 'text-gray-400'}`}>
+                    {getStepIcon(id)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium text-sm">{step.name}</h4>
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">{step.description}</p>
+                  </div>
+                  <div className={`flex-shrink-0 transition-colors ${selectedSteps.find(s => s.step_id === id) ? 'text-blue-400' : 'text-gray-600'}`}>
+                    {selectedSteps.find(s => s.step_id === id) ? (
+                      <CheckCircle className="w-5 h-5" />
+                    ) : (
+                      <Plus className="w-5 h-5" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -494,6 +515,203 @@ const WorkflowDetails = ({ workflow, onClose }) => {
   );
 };
 
+// Step Configuration Component
+const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [params, setParams] = useState(step.params || {});
+  const [isEditing, setIsEditing] = useState(false);
+
+  const schema = stepDefinition?.params_schema;
+  const properties = schema?.properties || {};
+
+  const handleParamChange = (key, value) => {
+    const newParams = { ...params, [key]: value };
+    setParams(newParams);
+    onUpdate(step.step_id, newParams);
+  };
+
+  const renderParamInput = (key, prop) => {
+    const value = params[key] ?? prop.default;
+    
+    switch (prop.type) {
+      case 'string':
+        if (prop.enum) {
+          return (
+            <select
+              value={value}
+              onChange={(e) => handleParamChange(key, e.target.value)}
+              className="w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+            >
+              {prop.enum.map(option => (
+                <option key={option} value={option}>
+                  {option.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </option>
+              ))}
+            </select>
+          );
+        }
+        return (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleParamChange(key, e.target.value)}
+            placeholder={prop.description}
+            className="w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+          />
+        );
+      
+      case 'number':
+        return (
+          <input
+            type="number"
+            value={value}
+            min={prop.minimum}
+            max={prop.maximum}
+            step="any"
+            onChange={(e) => handleParamChange(key, parseFloat(e.target.value))}
+            className="w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+          />
+        );
+      
+      case 'integer':
+        return (
+          <input
+            type="number"
+            value={value}
+            min={prop.minimum}
+            max={prop.maximum}
+            onChange={(e) => handleParamChange(key, parseInt(e.target.value))}
+            className="w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+          />
+        );
+      
+      case 'boolean':
+        return (
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={value}
+              onChange={(e) => handleParamChange(key, e.target.checked)}
+              className="w-4 h-4 text-blue-500 bg-gray-800 border-gray-700 rounded focus:ring-blue-500 focus:ring-2"
+            />
+          </div>
+        );
+      
+      case 'array':
+        if (prop.items?.enum) {
+          return (
+            <div className="space-y-2">
+              {prop.items.enum.map(option => (
+                <label key={option} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={Array.isArray(value) && value.includes(option)}
+                    onChange={(e) => {
+                      const currentArray = Array.isArray(value) ? value : [];
+                      const newArray = e.target.checked
+                        ? [...currentArray, option]
+                        : currentArray.filter(item => item !== option);
+                      handleParamChange(key, newArray);
+                    }}
+                    className="w-4 h-4 text-blue-500 bg-gray-800 border-gray-700 rounded focus:ring-blue-500 focus:ring-2"
+                  />
+                  <span className="text-sm text-gray-300">
+                    {option.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </span>
+                </label>
+              ))}
+            </div>
+          );
+        }
+        return (
+          <input
+            type="text"
+            value={Array.isArray(value) ? value.join(', ') : ''}
+            onChange={(e) => handleParamChange(key, e.target.value.split(',').map(s => s.trim()))}
+            placeholder="Comma-separated values"
+            className="w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+          />
+        );
+      
+      default:
+        return (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleParamChange(key, e.target.value)}
+            className="w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-sm"
+          />
+        );
+    }
+  };
+
+  const getStepIcon = (stepId) => {
+    const stepIcons = {
+      data_validation: <Shield className="w-5 h-5" />,
+      data_processing: <Cpu className="w-5 h-5" />,
+      model_training: <Target className="w-5 h-5" />,
+      result_analysis: <TrendingUp className="w-5 h-5" />,
+      data_cleaning: <Database className="w-5 h-5" />,
+      feature_engineering: <Settings className="w-5 h-5" />,
+      model_evaluation: <BarChart3 className="w-5 h-5" />,
+      deployment_prep: <Rocket className="w-5 h-5" />
+    };
+    return stepIcons[stepId] || <Zap className="w-5 h-5" />;
+  };
+
+  return (
+    <div className="bg-gray-800/30 rounded-xl border border-gray-700/50 overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/20 text-blue-400">
+              {getStepIcon(step.step_id)}
+            </div>
+            <div>
+              <h4 className="font-medium text-white">
+                {stepDefinition?.name || step.step_id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </h4>
+              <p className="text-sm text-gray-400">
+                {stepDefinition?.description || 'Step configuration'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-2 rounded-lg hover:bg-gray-700/50 transition-colors"
+            >
+              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => onRemove(step.step_id)}
+              className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      {isExpanded && (
+        <div className="border-t border-gray-700/50 p-4 space-y-4">
+          {Object.entries(properties).map(([key, prop]) => (
+            <div key={key} className="space-y-2">
+              <label className="block text-sm font-medium text-gray-300">
+                {prop.title || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {prop.description && (
+                  <span className="block text-xs text-gray-500 mt-1">{prop.description}</span>
+                )}
+              </label>
+              {renderParamInput(key, prop)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Statistics Component
 const Statistics = ({ workflows, notices }) => {
   const stats = {
@@ -563,6 +781,7 @@ export default function App() {
   const [isCreatingWorkflow, setIsCreatingWorkflow] = useState(false);
   const [lastWorkflowUpdate, setLastWorkflowUpdate] = useState(null);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true);
+  const [activeTab, setActiveTab] = useState('workflows'); // 'workflows' or 'notices'
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
@@ -775,6 +994,18 @@ export default function App() {
     });
   };
 
+  const updateStepParams = (stepId, params) => {
+    setSelectedSteps(prev => 
+      prev.map(step => 
+        step.step_id === stepId ? { ...step, params } : step
+      )
+    );
+  };
+
+  const removeStep = (stepId) => {
+    setSelectedSteps(prev => prev.filter(s => s.step_id !== stepId));
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white flex items-center justify-center">
@@ -798,21 +1029,22 @@ export default function App() {
         />
       )}
       
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-6 py-8">
+        {/* Header */}
         <header className="mb-12">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
-              <BarChart3 className="w-8 h-8 text-blue-400" />
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
+              <BarChart3 className="w-10 h-10 text-blue-400" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
                 Workflow Orchestration
               </h1>
-              <p className="text-gray-400 mt-1">Scientific computing made elegant</p>
+              <p className="text-gray-400 mt-2 text-lg">Scientific computing made elegant</p>
             </div>
           </div>
           {connectionError && (
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/20 border border-red-500/50 text-red-200">
+            <div className="flex items-center gap-2 p-4 rounded-lg bg-red-500/20 border border-red-500/50 text-red-200">
               <AlertCircle className="w-5 h-5" />
               <span className="text-sm">{connectionError}</span>
             </div>
@@ -821,24 +1053,25 @@ export default function App() {
 
         <Statistics workflows={workflows} notices={notices} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Workflow Creation */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-xl p-6 border border-gray-700/50 shadow-xl">
+        {/* Main Content */}
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+          {/* Workflow Creation Sidebar */}
+          <div className="xl:col-span-1">
+            <div className="bg-gray-800/30 backdrop-blur-sm rounded-2xl p-6 border border-gray-700/50 shadow-xl sticky top-8">
               <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
                 <Play className="w-5 h-5 text-blue-400" />
                 Create Workflow
               </h2>
               
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Workflow Name</label>
+                  <label className="block text-sm font-medium text-gray-300 mb-3">Workflow Name</label>
                   <input
                     type="text"
                     placeholder="Enter workflow name..."
                     value={workflowName}
                     onChange={(e) => setWorkflowName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-lg bg-gray-900/50 border border-gray-700 focus:border-blue-500 focus:outline-none transition-colors"
+                    className="w-full px-4 py-3 rounded-xl bg-gray-900/50 border border-gray-700 focus:border-blue-500 focus:outline-none transition-colors text-base"
                   />
                 </div>
                 
@@ -849,11 +1082,29 @@ export default function App() {
                   </label>
                   <StepSelector steps={steps} selectedSteps={selectedSteps} onStepToggle={toggleStep} />
                 </div>
+
+                {/* Selected Steps Configuration */}
+                {selectedSteps.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-300 mb-3">Step Configuration</h3>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {selectedSteps.map(step => (
+                        <StepConfiguration
+                          key={step.step_id}
+                          step={step}
+                          stepDefinition={steps[step.step_id]}
+                          onUpdate={updateStepParams}
+                          onRemove={removeStep}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 <button
                   onClick={createWorkflow}
                   disabled={!workflowName || selectedSteps.length === 0 || isCreatingWorkflow}
-                  className="w-full py-3 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium shadow-lg flex items-center justify-center gap-2"
+                  className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium shadow-lg flex items-center justify-center gap-2 text-base"
                 >
                   {isCreatingWorkflow ? (
                     <>
@@ -871,91 +1122,122 @@ export default function App() {
             </div>
           </div>
 
-          {/* Workflows & Notices */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Active Workflows */}
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-4">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-purple-400" />
-                    Active Workflows ({workflows.length})
-                    {workflowPollingRef.current && autoUpdateEnabled && (
-                      <span className="text-xs text-green-400 flex items-center gap-1">
-                        <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-                        Auto-updating
-                      </span>
-                    )}
-                  </h2>
-                  {lastWorkflowUpdate && (
-                    <span className="text-xs text-gray-500">
-                      Last updated: {lastWorkflowUpdate.toLocaleTimeString()}
-                    </span>
-                  )}
+          {/* Main Content Area */}
+          <div className="xl:col-span-3">
+            {/* Tab Navigation */}
+            <div className="flex items-center gap-1 mb-8 bg-gray-800/30 rounded-xl p-1 border border-gray-700/50">
+              <button
+                onClick={() => setActiveTab('workflows')}
+                className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-300 ${
+                  activeTab === 'workflows'
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+                }`}
+              >
+                <div className="flex items-center gap-2 justify-center">
+                  <BarChart3 className="w-4 h-4" />
+                  Workflows ({workflows.length})
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={toggleAutoUpdate}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${
-                      autoUpdateEnabled 
-                        ? 'bg-green-500/20 border-green-500/50 text-green-400 hover:border-green-400' 
-                        : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600'
-                    }`}
-                  >
-                    <div className={`w-2 h-2 rounded-full ${autoUpdateEnabled ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-                    {autoUpdateEnabled ? 'Auto' : 'Manual'}
-                  </button>
-                  <button
-                    onClick={fetchWorkflows}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-gray-600 transition-colors text-sm"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Refresh
-                  </button>
+              </button>
+              <button
+                onClick={() => setActiveTab('notices')}
+                className={`flex-1 py-3 px-6 rounded-lg font-medium transition-all duration-300 ${
+                  activeTab === 'notices'
+                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                    : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
+                }`}
+              >
+                <div className="flex items-center gap-2 justify-center">
+                  <Info className="w-4 h-4" />
+                  Notices ({notices.length})
                 </div>
-              </div>
-              
-              <div className="grid gap-4">
-                {workflows.length === 0 ? (
-                  <div className="text-center py-16 text-gray-500 bg-gray-800/30 rounded-xl border border-gray-700/50">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">No workflows yet</h3>
-                    <p className="text-sm">Create your first workflow to get started</p>
-                  </div>
-                ) : (
-                  workflows.map(workflow => (
-                    <WorkflowCard 
-                      key={workflow.id} 
-                      workflow={workflow} 
-                      onSelect={setSelectedWorkflow}
-                      isSelected={selectedWorkflow?.id === workflow.id}
-                      isAutoUpdating={!!workflowPollingRef.current && autoUpdateEnabled}
-                    />
-                  ))
-                )}
-              </div>
+              </button>
             </div>
 
-            {/* Notices */}
-            <div>
-              <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
-                <Info className="w-5 h-5 text-blue-400" />
-                System Notices ({notices.length})
-              </h2>
-              <div className="space-y-3 max-h-96 overflow-y-auto bg-gray-800/30 rounded-xl p-4 border border-gray-700/50">
-                {notices.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Info className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <h3 className="text-lg font-medium mb-2">No notices</h3>
-                    <p className="text-sm">System notices will appear here</p>
+            {/* Tab Content */}
+            {activeTab === 'workflows' ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                      <BarChart3 className="w-5 h-5 text-purple-400" />
+                      Active Workflows
+                      {workflowPollingRef.current && autoUpdateEnabled && (
+                        <span className="text-xs text-green-400 flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                          Auto-updating
+                        </span>
+                      )}
+                    </h2>
+                    {lastWorkflowUpdate && (
+                      <span className="text-xs text-gray-500">
+                        Last updated: {lastWorkflowUpdate.toLocaleTimeString()}
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  notices.map(notice => (
-                    <Notice key={notice.id} notice={notice} onDismiss={dismissNotice} />
-                  ))
-                )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={toggleAutoUpdate}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors text-sm ${
+                        autoUpdateEnabled 
+                          ? 'bg-green-500/20 border-green-500/50 text-green-400 hover:border-green-400' 
+                          : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full ${autoUpdateEnabled ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+                      {autoUpdateEnabled ? 'Auto' : 'Manual'}
+                    </button>
+                    <button
+                      onClick={fetchWorkflows}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-gray-600 transition-colors text-sm"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="grid gap-6">
+                  {workflows.length === 0 ? (
+                    <div className="text-center py-20 text-gray-500 bg-gray-800/30 rounded-2xl border border-gray-700/50">
+                      <BarChart3 className="w-16 h-16 mx-auto mb-6 opacity-50" />
+                      <h3 className="text-xl font-medium mb-3">No workflows yet</h3>
+                      <p className="text-gray-400">Create your first workflow to get started</p>
+                    </div>
+                  ) : (
+                    workflows.map(workflow => (
+                      <WorkflowCard 
+                        key={workflow.id} 
+                        workflow={workflow} 
+                        onSelect={setSelectedWorkflow}
+                        isSelected={selectedWorkflow?.id === workflow.id}
+                        isAutoUpdating={!!workflowPollingRef.current && autoUpdateEnabled}
+                      />
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Info className="w-5 h-5 text-blue-400" />
+                  System Notices
+                </h2>
+                <div className="space-y-4 max-h-[600px] overflow-y-auto bg-gray-800/30 rounded-2xl p-6 border border-gray-700/50">
+                  {notices.length === 0 ? (
+                    <div className="text-center py-16 text-gray-500">
+                      <Info className="w-16 h-16 mx-auto mb-6 opacity-50" />
+                      <h3 className="text-xl font-medium mb-3">No notices</h3>
+                      <p className="text-gray-400">System notices will appear here</p>
+                    </div>
+                  ) : (
+                    notices.map(notice => (
+                      <Notice key={notice.id} notice={notice} onDismiss={dismissNotice} />
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
