@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.core import StepContext, project_manager, NoticeManager
-from app.step_loader import StepLoader
+from app.step.loader import StepLoader
 
 class TestProjectManagement:
     """Test cases for project management functionality"""

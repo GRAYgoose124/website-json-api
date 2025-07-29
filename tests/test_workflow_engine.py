@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.core import WorkflowEngine, StepContext, project_manager, NoticeManager, StepRegistry
 from app.models import WorkflowDefinition, WorkflowStep, WorkflowInstance, WorkflowStatus
-from app.step_loader import StepLoader
+from app.step.loader import StepLoader
 from app.dependency_resolver import DependencyResolver
 
 class TestWorkflowEngine:

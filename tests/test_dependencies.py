@@ -2,18 +2,16 @@
 """
 Test script for dependency resolution system
 """
-import asyncio
 import sys
 import os
-import pytest
-from pathlib import Path
 
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.models import WorkflowDefinition, WorkflowStep, WorkflowInstance
+from app.models import WorkflowDefinition, WorkflowStep
 from app.dependency_resolver import DependencyResolver
-from app.step_loader import StepLoader
+from app.step.loader import StepLoader
+
 
 def test_dependency_resolution():
     """Test the dependency resolution system with actual step definitions"""

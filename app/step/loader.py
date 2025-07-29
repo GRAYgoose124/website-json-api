@@ -4,7 +4,7 @@ import importlib.util
 import inspect
 from typing import Dict, Any, Tuple, List
 from pathlib import Path
-from .models import StepDefinition
+from app.models import StepDefinition
 
 class StepLoader:
     """Dynamically loads step definitions and implementations from a custom path"""

@@ -3,7 +3,7 @@ import sys
 from pathlib import Path
 from app.api import app
 from app.core import step_registry, project_manager
-from app.step_loader import StepLoader
+from app.step.loader import StepLoader
 from app.dependency_resolver import DependencyResolver
 
 def main():
