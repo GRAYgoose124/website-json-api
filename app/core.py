@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional, Any, Callable
-from datetime import datetime
+from datetime import datetime, UTC
 import asyncio
 import traceback
 import os
@@ -26,7 +26,7 @@ class ProjectManager:
         project_path.mkdir(parents=True, exist_ok=True)
         
         # Generate secure project token
-        raw_token = f"{project_id}_{datetime.utcnow().isoformat()}_{uuid.uuid4()}"
+        raw_token = f"{project_id}_{datetime.now(UTC).isoformat()}_{uuid.uuid4()}"
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         
         # Store project info
@@ -35,7 +35,7 @@ class ProjectManager:
             'project_path': str(project_path),
             'project_name': project_name,
             'description': description,
-            'created_at': datetime.utcnow().isoformat(),
+            'created_at': datetime.now(UTC).isoformat(),
             'raw_token': raw_token
         }
         self.project_tokens[token_hash] = project_info
@@ -239,7 +239,7 @@ class WorkflowEngine:
         """Execute a workflow with proper project isolation"""
         try:
             workflow.status = WorkflowStatus.RUNNING
-            workflow.started_at = datetime.utcnow()
+            workflow.started_at = datetime.now(UTC)
             
             # Initialize workflow context
             workflow.context = {}
@@ -283,15 +283,15 @@ class WorkflowEngine:
                 except Exception as e:
                     await context.error("Step Failed", f"Step {step_id} failed: {str(e)}")
                     workflow.status = WorkflowStatus.FAILED
-                    workflow.completed_at = datetime.utcnow()
+                    workflow.completed_at = datetime.now(UTC)
                     return
             
             workflow.status = WorkflowStatus.COMPLETED
-            workflow.completed_at = datetime.utcnow()
+            workflow.completed_at = datetime.now(UTC)
             
         except Exception as e:
             workflow.status = WorkflowStatus.FAILED
-            workflow.completed_at = datetime.utcnow()
+            workflow.completed_at = datetime.now(UTC)
             await self.notice_manager.emit(Notice(
                 type=NoticeType.ERROR,
                 severity=NoticeSeverity.HIGH,

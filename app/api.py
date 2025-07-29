@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Query, UploadFile, File
 from fastapi.responses import FileResponse
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, UTC
 import asyncio
 import os
 import shutil
@@ -44,7 +44,7 @@ async def upload_file(file: UploadFile = File(...)):
         uploads_dir.mkdir(exist_ok=True)
         
         # Create a unique filename to avoid conflicts
-        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{file.filename}"
         file_path = uploads_dir / filename
         
@@ -250,7 +250,7 @@ async def websocket_notices(websocket: WebSocket):
         while not connection_closed[0]:
             try:
                 # Send ping to keep connection alive
-                await websocket.send_json({"type": "ping", "timestamp": datetime.utcnow().isoformat()})
+                await websocket.send_json({"type": "ping", "timestamp": datetime.now(UTC).isoformat()})
                 await asyncio.sleep(30)  # Ping every 30 seconds
             except WebSocketDisconnect:
                 connection_closed[0] = True

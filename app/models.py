@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any, Union
 from enum import Enum
-from datetime import datetime
+from datetime import datetime, UTC
 import uuid
 
 # Enums
@@ -64,7 +64,7 @@ class Notice(BaseModel):
     severity: NoticeSeverity
     title: str
     message: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     metadata: Dict[str, Any] = {}
     workflow_id: Optional[str] = None
     step_id: Optional[str] = None
@@ -106,7 +106,7 @@ class WorkflowInstance(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     definition: WorkflowDefinition
     status: WorkflowStatus = WorkflowStatus.PENDING
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     current_step: Optional[str] = None

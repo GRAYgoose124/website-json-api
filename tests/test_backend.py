@@ -4,25 +4,26 @@ Comprehensive test script to verify the backend functionality
 """
 import asyncio
 import aiohttp
-import json
 import pytest
 import pytest_asyncio
 import tempfile
 import os
 import subprocess
 import time
-import signal
 import shutil
-from datetime import datetime
+import random
 from pathlib import Path
 
 class ServerManager:
     """Manages a test server instance"""
     
-    def __init__(self, port=8009):
-        self.port = port
+    def __init__(self, port=None):
+        if port is None:
+            self.port = 10000 + random.randint(0, 1000)
+        else:
+            self.port = port
         self.process = None
-        self.base_url = f"http://localhost:{port}"
+        self.base_url = f"http://localhost:{self.port}"
         self.test_userdata_dir = Path("./test-userdata")
     
     async def start(self):
@@ -66,6 +67,13 @@ class ServerManager:
                 # Force kill if graceful shutdown fails
                 self.process.kill()
                 self.process.wait()
+            
+            # Close the pipes to prevent resource warnings
+            if self.process.stdout:
+                self.process.stdout.close()
+            if self.process.stderr:
+                self.process.stderr.close()
+            
             self.process = None
         
         # Clean up test data

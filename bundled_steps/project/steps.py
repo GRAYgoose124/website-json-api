@@ -7,7 +7,7 @@ import zipfile
 import json
 from pathlib import Path
 from typing import Dict, Any, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.core import StepContext, project_manager
 
@@ -140,7 +140,7 @@ async def download_project_zip(params: Dict[str, Any], context: StepContext):
     os.makedirs(downloads_dir, exist_ok=True)
     
     # Generate ZIP filename
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     zip_filename = f"{project_name}_{timestamp}.zip"
     zip_path = os.path.join(downloads_dir, zip_filename)
     
