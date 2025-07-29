@@ -1,6 +1,6 @@
 from app.api import app
 from app.core import step_registry
-from app.steps import (
+from steps import (
     get_step_definitions,
     validate_data,
     process_data,

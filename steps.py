@@ -1,7 +1,7 @@
 import asyncio
 from typing import Dict, Any
-from .models import StepDefinition
-from .core import StepContext
+from app.models import StepDefinition
+from app.core import StepContext
 
 # Step definitions and implementations
 def get_step_definitions():
