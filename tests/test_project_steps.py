@@ -84,7 +84,7 @@ class TestProjectManagement:
     async def test_create_project_step(self, temp_project_dir, context, step_loader):
         """Test create_project step"""
         # Load step implementation
-        _, step_implementations = step_loader.load_from_path("project_steps")
+        _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']
         
         # Temporarily set the projects root
@@ -115,7 +115,7 @@ class TestProjectManagement:
     async def test_upload_file_to_project_step(self, temp_project_dir, context, step_loader):
         """Test upload_file_to_project step"""
         # Load step implementations
-        _, step_implementations = step_loader.load_from_path("project_steps")
+        _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']
         upload_file_func = step_implementations['upload_file_to_project']
         
@@ -153,7 +153,7 @@ class TestProjectManagement:
     async def test_upload_file_invalid_token(self, temp_project_dir, context, step_loader):
         """Test file upload with invalid token"""
         # Load step implementation
-        _, step_implementations = step_loader.load_from_path("project_steps")
+        _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         upload_file_func = step_implementations['upload_file_to_project']
         
         # Create a test file
@@ -174,7 +174,7 @@ class TestProjectManagement:
     async def test_validate_project_token_step(self, temp_project_dir, context, step_loader):
         """Test validate_project_token step"""
         # Load step implementations
-        _, step_implementations = step_loader.load_from_path("project_steps")
+        _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']
         validate_token_func = step_implementations['validate_project_token']
         
@@ -212,7 +212,7 @@ class TestProjectManagement:
     async def test_list_project_files_step(self, temp_project_dir, context, step_loader):
         """Test list_project_files step"""
         # Load step implementations
-        _, step_implementations = step_loader.load_from_path("project_steps")
+        _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']
         upload_file_func = step_implementations['upload_file_to_project']
         list_files_func = step_implementations['list_project_files']
@@ -268,7 +268,7 @@ class TestProjectManagement:
     async def test_download_project_zip_step(self, temp_project_dir, context, step_loader):
         """Test download_project_zip step"""
         # Load step implementations
-        _, step_implementations = step_loader.load_from_path("project_steps")
+        _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']
         upload_file_func = step_implementations['upload_file_to_project']
         download_zip_func = step_implementations['download_project_zip']

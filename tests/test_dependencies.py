@@ -22,7 +22,7 @@ def test_dependency_resolution():
     
     # Load actual step definitions from project_steps
     step_loader = StepLoader()
-    step_definitions, _ = step_loader.load_from_path("project_steps")
+    step_definitions, _ = step_loader.load_from_path("bundled_steps/project")
     
     # Create dependency resolver with actual steps
     resolver = DependencyResolver(step_definitions)
@@ -104,7 +104,7 @@ def test_step_definitions():
     
     # Load actual step definitions
     step_loader = StepLoader()
-    step_definitions, _ = step_loader.load_from_path("project_steps")
+    step_definitions, _ = step_loader.load_from_path("bundled_steps/project")
     
     for step_id, definition in step_definitions.items():
         print(f"\n📦 {step_id}:")
@@ -127,7 +127,7 @@ def test_custom_steps_dependencies():
     
     # Load custom step definitions
     step_loader = StepLoader()
-    step_definitions, _ = step_loader.load_from_path("custom_steps")
+    step_definitions, _ = step_loader.load_from_path("bundled_steps/custom")
     
     resolver = DependencyResolver(step_definitions)
     

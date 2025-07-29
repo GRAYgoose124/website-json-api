@@ -47,7 +47,7 @@ class TestWorkflowEngine:
     def workflow_engine(self, step_loader, step_registry, notice_manager):
         """Create a workflow engine for testing"""
         # Load step definitions and implementations
-        step_definitions, step_implementations = step_loader.load_from_path("project_steps")
+        step_definitions, step_implementations = step_loader.load_from_path("bundled_steps/project")
         
         # Create dependency resolver
         dependency_resolver = DependencyResolver(step_definitions)
@@ -304,7 +304,7 @@ class TestWorkflowEngine:
     async def test_dependency_resolution(self, step_loader):
         """Test dependency resolution"""
         # Load step definitions
-        step_definitions, _ = step_loader.load_from_path("project_steps")
+        step_definitions, _ = step_loader.load_from_path("bundled_steps/project")
         
         # Create dependency resolver
         resolver = DependencyResolver(step_definitions)

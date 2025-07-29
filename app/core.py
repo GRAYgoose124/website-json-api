@@ -6,20 +6,14 @@ import os
 import uuid
 import hashlib
 from pathlib import Path
-from .models import Notice, NoticeType, NoticeSeverity, WorkflowStatus, StepDefinition, WorkflowInstance, DependencyResolution
+from .models import Notice, NoticeType, NoticeSeverity, WorkflowStatus, StepDefinition, WorkflowInstance, DependencyResolution, WorkflowStep
 from .dependency_resolver import DependencyResolver
 
 class ProjectManager:
     """Manages project isolation and security"""
     
     def __init__(self, projects_root: str = None):
-        if projects_root is None:
-            # Use a local projects directory in the current working directory
-            import os
-            projects_root = os.path.join(os.getcwd(), "projects")
-        
-        self.projects_root = Path(projects_root).resolve()
-        self.projects_root.mkdir(parents=True, exist_ok=True)
+        self.projects_root = projects_root
         self.project_tokens: Dict[str, Dict[str, Any]] = {}  # token_hash -> project_info
     
     def create_project(self, project_name: str, description: str = "") -> Dict[str, Any]:
@@ -75,8 +69,6 @@ class ProjectManager:
         project_info = self.validate_token(token)
         return project_info['project_path'] if project_info else None
 
-# Global project manager instance
-project_manager = ProjectManager()
 
 class NoticeManager:
     def __init__(self):
@@ -308,7 +300,7 @@ class WorkflowEngine:
                 workflow_id=workflow.id
             ))
     
-    def _prepare_step_params(self, step: 'WorkflowStep', context: Dict[str, Any]) -> Dict[str, Any]:
+    def _prepare_step_params(self, step: WorkflowStep, context: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare step parameters, filling in context values where needed"""
         params = step.params.copy()
         
@@ -353,6 +345,7 @@ class WorkflowEngine:
         return self.step_registry.resolve_dependencies(workflow)
 
 # Global instances
+project_manager = ProjectManager()
 notice_manager = NoticeManager()
 step_registry = StepRegistry()
 workflow_engine = WorkflowEngine(step_registry, notice_manager) 

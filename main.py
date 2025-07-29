@@ -9,10 +9,10 @@ from app.dependency_resolver import DependencyResolver
 def main():
     parser = argparse.ArgumentParser(description="Workflow API Server")
     parser.add_argument(
-        "--config-root", 
+        "--userdata-root", 
         type=str, 
-        required=True,
-        help="Path to main configuration directory (will contain uploads and projects)"
+        default="./userdata",
+        help="Path to main userdata directory (will contain uploads and projects)"
     )
     parser.add_argument(
         "--include-steps-root", 
@@ -36,17 +36,17 @@ def main():
     
     args = parser.parse_args()
     
-    # Create config root directory
-    config_root = Path(args.config_root).resolve()
-    config_root.mkdir(parents=True, exist_ok=True)
+    # Create userdata root directory
+    userdata_root = Path(args.userdata_root).resolve()
+    userdata_root.mkdir(parents=True, exist_ok=True)
     
-    # Set up subdirectories under config root
-    uploads_dir = config_root / "uploads"
-    projects_dir = config_root / "projects"
+    # Set up subdirectories under userdata root
+    uploads_dir = userdata_root / "uploads"
+    projects_dir = userdata_root / "projects"
     uploads_dir.mkdir(exist_ok=True)
     projects_dir.mkdir(exist_ok=True)
     
-    # Configure project manager with projects directory under config root
+    # Configure project manager with projects directory under userdata root
     project_manager.projects_root = projects_dir
     print(f"Using projects directory: {project_manager.projects_root}")
     
@@ -61,7 +61,7 @@ def main():
     # Require at least one include-steps-root to be specified
     if not args.include_steps_root:
         print("Error: At least one --include-steps-root must be specified")
-        print("Example: --include-steps-root ./project_steps --include-steps-root ./custom_steps")
+        print("Example: --include-steps-root ./bundled_steps/project --include-steps-root ./bundled_steps/custom")
         sys.exit(1)
     
     step_paths = args.include_steps_root

@@ -12,29 +12,38 @@ import os
 import subprocess
 import time
 import signal
+import shutil
 from datetime import datetime
 from pathlib import Path
 
 class ServerManager:
     """Manages a test server instance"""
     
-    def __init__(self, port=8001):
+    def __init__(self, port=8009):
         self.port = port
         self.process = None
         self.base_url = f"http://localhost:{port}"
+        self.test_userdata_dir = Path("./test-userdata")
     
     async def start(self):
         """Start the test server"""
+        # Clean up any existing test data
+        await self._cleanup_test_data()
+        
         # Kill any existing processes on the port
         await self._kill_existing_processes()
         
         # Start the server
         cmd = [
             "uv", "run", "main.py",
-            "--config-root", "./config",
-            "--include-steps-root", "./project_steps",
-            "--include-steps-root", "./custom_steps"
+            "--userdata-root", "./test-userdata",
+            "--include-steps-root", "./bundled_steps/project",
+            "--include-steps-root", "./bundled_steps/custom",
+            "--host", "127.0.0.1",
+            "--port", str(self.port)
         ]
+        
+        print(f"🚀 Starting test server with command: {' '.join(cmd)}")
         
         self.process = subprocess.Popen(
             cmd,
@@ -47,7 +56,7 @@ class ServerManager:
         await self._wait_for_server()
     
     async def stop(self):
-        """Stop the test server"""
+        """Stop the test server and clean up test data"""
         if self.process:
             # Try graceful shutdown first
             self.process.terminate()
@@ -58,6 +67,18 @@ class ServerManager:
                 self.process.kill()
                 self.process.wait()
             self.process = None
+        
+        # Clean up test data
+        await self._cleanup_test_data()
+    
+    async def _cleanup_test_data(self):
+        """Clean up test userdata directory"""
+        if self.test_userdata_dir.exists():
+            try:
+                shutil.rmtree(self.test_userdata_dir)
+                print(f"🧹 Cleaned up test data: {self.test_userdata_dir}")
+            except Exception as e:
+                print(f"⚠️  Warning: Could not clean up test data: {e}")
     
     async def _kill_existing_processes(self):
         """Kill any existing processes using the test port"""
@@ -70,17 +91,25 @@ class ServerManager:
     
     async def _wait_for_server(self, timeout=30):
         """Wait for the server to be ready"""
+        print(f"⏳ Waiting for server to be ready at {self.base_url}...")
         start_time = time.time()
+        attempts = 0
         while time.time() - start_time < timeout:
+            attempts += 1
             try:
                 async with aiohttp.ClientSession() as session:
                     async with session.get(f"{self.base_url}/steps", timeout=2) as response:
                         if response.status == 200:
+                            print(f"✅ Server is ready after {attempts} attempts!")
                             return
-            except Exception:
-                pass
+                        else:
+                            print(f"⚠️  Server responded with status {response.status} on attempt {attempts}")
+            except Exception as e:
+                if attempts % 10 == 0:  # Only print every 10th attempt to avoid spam
+                    print(f"⏳ Attempt {attempts}: Server not ready yet ({type(e).__name__}: {e})")
             await asyncio.sleep(0.5)
         
+        print(f"❌ Server failed to start within {timeout} seconds after {attempts} attempts")
         raise TimeoutError(f"Server failed to start within {timeout} seconds")
 
 @pytest_asyncio.fixture(scope="session")
