@@ -263,8 +263,8 @@ class TestWorkflowEngine:
         # Execute the workflow
         await workflow_engine.execute_workflow(workflow_instance)
         
-        # Verify the workflow completed (even with errors)
-        assert workflow_instance.status == WorkflowStatus.COMPLETED
+        # Verify the workflow failed due to step error
+        assert workflow_instance.status == WorkflowStatus.FAILED
         
         # Verify step failed
         upload_result = workflow_instance.step_results["upload_file_to_project"]

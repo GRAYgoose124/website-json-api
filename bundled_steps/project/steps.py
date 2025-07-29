@@ -124,6 +124,7 @@ async def upload_file_to_project(params: Dict[str, Any], context: StepContext):
 async def download_project_zip(params: Dict[str, Any], context: StepContext):
     """Creates a ZIP archive of the project and provides download path"""
     project_token = params.get('project_token')
+    uploaded_file_path = params.get('uploaded_file_path', '')
     include_hidden = params.get('include_hidden', False)
     compression_level = params.get('compression_level', 6)
     
@@ -144,6 +145,12 @@ async def download_project_zip(params: Dict[str, Any], context: StepContext):
     
     await context.info("Token Validated", f"Preparing ZIP for project: {project_name}")
     
+    # Check if files have been uploaded (optional dependency check)
+    if uploaded_file_path:
+        await context.info("Files Detected", f"Found uploaded file: {uploaded_file_path}")
+    else:
+        await context.info("No Files Specified", "No specific uploaded files detected, will include all project files")
+    
     # Create downloads directory if it doesn't exist
     downloads_dir = os.path.join(os.path.dirname(project_path), 'downloads')
     os.makedirs(downloads_dir, exist_ok=True)
@@ -158,6 +165,11 @@ async def download_project_zip(params: Dict[str, Any], context: StepContext):
     try:
         files_included = 0
         
+        # Log initial setup before ZIP creation
+        await context.info("ZIP Debug", f"Creating ZIP at: {zip_path}")
+        await context.info("ZIP Debug", f"Scanning project directory: {project_path}")
+        await context.info("ZIP Debug", f"Project directory exists: {os.path.exists(project_path)}")
+        
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED, compresslevel=compression_level) as zipf:
             for root, dirs, files in os.walk(project_path):
                 # Filter hidden files/directories if not included
@@ -167,13 +179,14 @@ async def download_project_zip(params: Dict[str, Any], context: StepContext):
                 
                 for file in files:
                     file_path = os.path.join(root, file)
-                    # Calculate relative path for ZIP
-                    arcname = os.path.relpath(file_path, project_path)
-                    zipf.write(file_path, arcname)
-                    files_included += 1
                     
-                    if files_included % 10 == 0:
-                        await context.info("ZIP Progress", f"Added {files_included} files to ZIP")
+                    if os.path.exists(file_path):
+                        # Calculate relative path for ZIP
+                        arcname = os.path.relpath(file_path, project_path)
+                        zipf.write(file_path, arcname)
+                        files_included += 1
+                    else:
+                        await context.error("ZIP Error", f"File not found: {file_path}")
         
         zip_file_size = os.path.getsize(zip_path)
         
@@ -196,6 +209,8 @@ async def download_project_zip(params: Dict[str, Any], context: StepContext):
         
     except Exception as e:
         await context.error("ZIP Creation Failed", f"Failed to create ZIP: {str(e)}")
+        import traceback
+        await context.error("ZIP Error Details", f"Error traceback: {traceback.format_exc()}")
         return {
             'zip_file_path': '',
             'zip_file_size': 0,

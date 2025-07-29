@@ -126,6 +126,12 @@ STEP_DEFINITIONS = {
                     required=True
                 ),
                 IOSchema(
+                    name="uploaded_file_path",
+                    type=DataType.STRING,
+                    description="Path to uploaded file (ensures files are uploaded before downloading)",
+                    required=False
+                ),
+                IOSchema(
                     name="include_hidden",
                     type=DataType.BOOLEAN,
                     description="Include hidden files and directories in the ZIP",

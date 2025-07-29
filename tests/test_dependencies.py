@@ -95,6 +95,73 @@ def test_dependency_resolution():
     
     print("\n✅ Dependency resolution tests completed!")
 
+def test_upload_download_dependency():
+    """Test that upload_file_to_project comes before download_project_zip"""
+    print("\n📋 Test 6: Upload Before Download Dependency")
+    print("=" * 50)
+    
+    # Load actual step definitions
+    step_loader = StepLoader()
+    step_definitions, _ = step_loader.load_from_path("bundled_steps/project")
+    resolver = DependencyResolver(step_definitions)
+    
+    # Create workflow with the three project steps
+    workflow = WorkflowDefinition(
+        name="Upload Download Test",
+        description="Test that upload comes before download",
+        steps=[
+            WorkflowStep(step_id="create_project", params={"project_name": "Test Project"}),
+            WorkflowStep(step_id="upload_file_to_project", params={"file_path": "/test/file.txt"}),
+            WorkflowStep(step_id="download_project_zip", params={}),
+        ]
+    )
+    
+    resolution = resolver.resolve_dependencies(workflow)
+    
+    print(f"Workflow steps: {[step.step_id for step in workflow.steps]}")
+    print(f"Execution order: {' -> '.join(resolution.execution_order)}")
+    
+    # Check if upload comes before download
+    try:
+        upload_index = resolution.execution_order.index("upload_file_to_project")
+        download_index = resolution.execution_order.index("download_project_zip")
+        
+        if upload_index < download_index:
+            print("✅ SUCCESS: upload_file_to_project comes before download_project_zip")
+        else:
+            print("❌ FAILURE: download_project_zip comes before upload_file_to_project")
+            assert False, "download_project_zip comes before upload_file_to_project"
+            
+    except ValueError as e:
+        print(f"❌ ERROR: Could not find step in execution order: {e}")
+        assert False, f"Could not find step in execution order: {e}"
+    
+    # Check dependencies
+    print("\nDependencies:")
+    for step_id, deps in resolution.dependencies.items():
+        if deps:
+            print(f"  {step_id} depends on: {deps}")
+        else:
+            print(f"  {step_id} has no dependencies")
+    
+    # Check context flow
+    print("\nContext Flow:")
+    for step_id, context_flow in resolution.context_flow.items():
+        if context_flow:
+            print(f"  {step_id} requires: {context_flow}")
+        else:
+            print(f"  {step_id} requires no context")
+    
+    # Verify that download_project_zip depends on upload_file_to_project
+    download_deps = resolution.dependencies.get("download_project_zip", [])
+    if "upload_file_to_project" in download_deps:
+        print("✅ SUCCESS: download_project_zip correctly depends on upload_file_to_project")
+    else:
+        print("❌ FAILURE: download_project_zip does not depend on upload_file_to_project")
+        assert False, "download_project_zip does not depend on upload_file_to_project"
+    
+    print("✅ All dependency tests passed!")
+
 def test_step_definitions():
     """Test step definitions and IO schemas"""
     print("\n🔧 Testing Step Definitions")
@@ -153,4 +220,5 @@ def test_custom_steps_dependencies():
 if __name__ == "__main__":
     test_step_definitions()
     test_dependency_resolution()
+    test_upload_download_dependency()
     test_custom_steps_dependencies() 

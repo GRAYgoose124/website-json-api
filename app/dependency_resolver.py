@@ -28,7 +28,7 @@ class DependencyResolver:
         context_providers = {}  # context_key -> step_id
         context_consumers = defaultdict(list)  # context_key -> [step_ids]
         
-        # First pass: identify what each step provides and requires
+        # First pass: identify what each step provides
         for step in workflow.steps:
             step_def = self.step_definitions.get(step.step_id)
             if not step_def:
@@ -41,9 +41,17 @@ class DependencyResolver:
                                 f"{context_providers[context_key]} and {step.step_id}")
                 context_providers[context_key] = step.step_id
                 step.provides.append(context_key)
+        
+        # Second pass: identify what each step requires
+        for step in workflow.steps:
+            step_def = self.step_definitions.get(step.step_id)
+            if not step_def:
+                continue
             
             # What this step requires
             for input_schema in step_def.io.inputs:
+                # Consider both required and optional inputs that have context providers
+                # This ensures proper dependency ordering even for optional inputs
                 if input_schema.name in context_providers:
                     provider_step = context_providers[input_schema.name]
                     if provider_step != step.step_id:
@@ -134,6 +142,12 @@ class DependencyResolver:
     
     def _topological_sort(self, dependencies: Dict[str, List[str]], workflow: WorkflowDefinition) -> List[str]:
         """Perform topological sort to determine execution order"""
+        # Build dependents dictionary (reverse of dependencies)
+        dependents = defaultdict(list)
+        for node, deps in dependencies.items():
+            for dep in deps:
+                dependents[dep].append(node)
+        
         # Calculate in-degrees for all steps in the workflow
         in_degree = defaultdict(int)
         
@@ -155,7 +169,7 @@ class DependencyResolver:
             result.append(node)
             
             # Reduce in-degree for dependents
-            for dependent in dependencies.get(node, []):
+            for dependent in dependents[node]:
                 in_degree[dependent] -= 1
                 if in_degree[dependent] == 0:
                     queue.append(dependent)
