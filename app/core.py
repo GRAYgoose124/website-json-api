@@ -2,7 +2,7 @@ from typing import List, Dict, Optional, Any, Callable
 from datetime import datetime
 import asyncio
 import traceback
-from .models import Notice, NoticeType, NoticeSeverity, WorkflowStatus, StepDefinition
+from .models import Notice, NoticeType, NoticeSeverity, WorkflowStatus, StepDefinition, WorkflowInstance
 
 class NoticeManager:
     def __init__(self):
@@ -118,9 +118,9 @@ class WorkflowEngine:
     def __init__(self, step_registry: StepRegistry, notice_manager: NoticeManager):
         self.step_registry = step_registry
         self.notice_manager = notice_manager
-        self.workflows: Dict[str, 'WorkflowInstance'] = {}
+        self.workflows: Dict[str, WorkflowInstance] = {}
     
-    async def execute_workflow(self, workflow: 'WorkflowInstance'):
+    async def execute_workflow(self, workflow: WorkflowInstance):
         workflow.status = WorkflowStatus.RUNNING
         workflow.started_at = datetime.utcnow()
         

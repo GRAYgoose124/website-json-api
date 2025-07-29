@@ -1,170 +1,174 @@
-# Scientific Workflow Orchestration System
+# Workflow API with Dynamic Step Loading
 
-A modern, real-time workflow orchestration system for scientific computing with a beautiful React frontend and FastAPI backend.
-
-## Features
-
-- 🚀 **Real-time Workflow Execution** - Watch workflows execute step-by-step with live updates
-- 📊 **Beautiful UI** - Modern, responsive interface with real-time notifications
-- 🔄 **WebSocket Integration** - Live updates and connection management
-- 📋 **Step Registry** - Easy to add new workflow steps
-- 🎯 **Notice System** - Comprehensive logging and notification system
-- 🎨 **Modern Design** - Glassmorphism UI with smooth animations
+This API allows you to define and execute custom workflow steps. The system dynamically loads step definitions and implementations from custom directories using a callback-based architecture.
 
 ## Quick Start
 
-### Prerequisites
+### Using Custom Steps
+```bash
+python main.py --config-root /path/to/your/steps
+# or
+uv run main.py --config-root /path/to/your/steps
+```
 
-- Python 3.12+
-- Node.js 16+
-- npm or yarn
+**Note:** The `--config-root` parameter is required. You must provide a path to your step definitions.
 
-### Backend Setup
+## Custom Step Structure
 
-1. **Install Python dependencies:**
-   ```bash
-   pip install fastapi uvicorn pydantic aiohttp
-   ```
+Your custom step directory should contain Python files with step definitions and implementations. The system uses a callback-based approach where step definitions reference their implementations.
 
-2. **Start the backend server:**
-   ```bash
-   uvicorn json_api:app --reload --port 8001
-   ```
+### Required Structure
 
-   The API will be available at `http://localhost:8001`
+1. **Step Definitions**: A dictionary or function that returns `StepDefinition` objects with callback references
+2. **Step Implementations**: Async functions that implement the steps, referenced by callbacks
 
-### Frontend Setup
+### Example Custom Step Structure
 
-1. **Navigate to the frontend directory:**
-   ```bash
-   cd workflow-ui
-   ```
+```
+custom_steps/
+├── definitions.py    # Step definitions with callbacks
+└── steps.py         # Step implementations
+```
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+### Example Custom Step Files
 
-3. **Start the development server:**
-   ```bash
-   npm run dev
-   ```
+**definitions.py:**
+```python
+from app.models import StepDefinition
 
-   The frontend will be available at `http://localhost:5173`
+STEP_DEFINITIONS = {
+    "data_validation": StepDefinition(
+        id="data_validation",
+        name="Data Validation",
+        description="Validates input data format and constraints",
+        callback="steps.validate_data",  # References implementation
+        params_schema={
+            "type": "object",
+            "properties": {
+                "data_path": {
+                    "type": "string",
+                    "title": "Data Path",
+                    "description": "Path to the data file to validate"
+                }
+            },
+            "required": ["data_path"]
+        }
+    )
+}
+```
 
-## Usage
+**steps.py:**
+```python
+import asyncio
+from typing import Dict, Any
+from app.core import StepContext
 
-### Creating Workflows
+async def validate_data(params: Dict[str, Any], context: StepContext):
+    await context.info("Starting", f"Validating {params.get('data_path')}")
+    
+    # Your custom logic here
+    await asyncio.sleep(1)
+    
+    await context.success("Complete", "Validation completed")
+    return {"valid": True, "records": 1000}
+```
 
-1. **Select Steps**: Choose from available workflow steps in the left panel
-2. **Name Your Workflow**: Enter a descriptive name
-3. **Create**: Click "Create Workflow" to start execution
+### Callback Resolution
 
-### Available Steps
+The system supports several callback formats:
 
-- **Data Validation** - Validates input data format and constraints
-- **Data Cleaning** - Cleans and preprocesses raw data
-- **Data Processing** - Processes validated data
-- **Feature Engineering** - Creates and selects features for ML
-- **Model Training** - Trains machine learning models
-- **Model Evaluation** - Evaluates model performance
-- **Result Analysis** - Analyzes results and generates reports
-- **Deployment Preparation** - Prepares model for production
+1. **Full module path**: `"custom_steps.steps.validate_data"`
+2. **Relative path**: `".steps.validate_data"` (relative to config root)
+3. **Direct function reference**: The function name if it's in the same module
 
-### Real-time Monitoring
+### File Naming Conventions
 
-- **Live Updates**: Watch workflow progress in real-time
-- **System Notices**: View detailed logs and notifications
-- **Connection Status**: Monitor WebSocket connection health
-- **Auto-reconnection**: Automatic reconnection on connection loss
+The system will automatically find step files with these patterns:
+- `definitions.py` (preferred for step definitions)
+- `steps.py` (preferred for step implementations)
+- `step_definitions.py`
+- `workflow_steps.py`
+- `*.steps.py`
+- Any `.py` file (except `__init__.py`)
+
+## Step Implementation Requirements
+
+Each step implementation must:
+
+1. Be an async function
+2. Accept exactly 2 parameters:
+   - `params`: Dictionary of step parameters
+   - `context`: StepContext object for logging
+3. Return a dictionary with results
+
+### StepContext Methods
+
+- `context.info(title, message)`: Log informational message
+- `context.warning(title, message)`: Log warning message
+- `context.error(title, message)`: Log error message
+- `context.success(title, message)`: Log success message
+
+## Command Line Options
+
+```bash
+python main.py --help
+```
+
+Available options:
+- `--config-root`: Path to directory containing custom step definitions (required)
+- `--host`: Host to bind server to (default: 0.0.0.0)
+- `--port`: Port to bind server to (default: 8001)
+
+## Example Usage
+
+### 1. Create Custom Steps Directory
+```
+my_custom_steps/
+├── definitions.py
+└── steps.py
+```
+
+### 2. Run with Custom Steps
+```bash
+python main.py --config-root ./my_custom_steps
+```
+
+### 3. The system will:
+- Load all Python files in the directory
+- Extract step definitions from `STEP_DEFINITIONS` or `get_step_definitions()`
+- Resolve callback references to actual functions
+- Register all steps automatically
+- Validate that all definitions have implementations
+
+## Validation
+
+The system validates:
+- All step definitions have corresponding implementations (via callbacks)
+- All callback references can be resolved
+- Step function signatures are correct
+
+If validation fails, the server will not start and will show error messages.
 
 ## API Endpoints
 
-### HTTP Endpoints
+Once running, the API provides endpoints for:
+- Listing available steps
+- Executing individual steps
+- Managing workflows
+- Real-time notifications
 
-- `GET /steps` - Get available workflow steps
-- `GET /workflows` - List all workflows
-- `POST /workflows` - Create a new workflow
-- `GET /workflows/{id}` - Get specific workflow
-- `GET /notices` - Get system notices
-- `DELETE /notices/{id}` - Dismiss a notice
+## Error Handling
 
-### WebSocket Endpoints
+- Missing step directories will show clear error messages
+- Invalid callback references will be caught and reported
+- Validation errors prevent server startup
+- Runtime errors are logged and reported via the notification system
 
-- `WS /ws/notices` - Real-time notice updates
+## Migration from Old Format
 
-## Development
+If you have existing step files in the old format, you can:
 
-### Adding New Steps
-
-1. **Define the step function:**
-   ```python
-   @step_registry.register(StepDefinition(
-       id="my_step",
-       name="My Step",
-       description="Description of what this step does",
-       params_schema={
-           "type": "object",
-           "properties": {
-               "param1": {"type": "string"}
-           }
-       }
-   ))
-   async def my_step(params: Dict[str, Any], context: StepContext):
-       await context.info("Starting", "Step started")
-       # Your step logic here
-       await context.success("Complete", "Step completed")
-       return {"result": "success"}
-   ```
-
-2. **The step will automatically appear in the UI**
-
-### Testing
-
-Run the backend test script:
-```bash
-python test_backend.py
-```
-
-## Architecture
-
-### Backend (FastAPI)
-
-- **NoticeManager**: Handles real-time notifications
-- **StepRegistry**: Manages available workflow steps
-- **WorkflowEngine**: Executes workflows with dependency resolution
-- **WebSocket**: Real-time communication
-
-### Frontend (React)
-
-- **Real-time Updates**: WebSocket connection with auto-reconnection
-- **Modern UI**: Tailwind CSS with glassmorphism design
-- **Responsive**: Works on desktop and mobile
-- **Error Handling**: Comprehensive error states and recovery
-
-## Troubleshooting
-
-### WebSocket Connection Issues
-
-1. **Check CORS settings** in `main.py`
-2. **Verify backend is running** on port 8001
-3. **Check browser console** for connection errors
-4. **Restart both servers** if needed
-
-### Workflow Execution Issues
-
-1. **Check step definitions** are properly registered
-2. **Verify step dependencies** are correctly set
-3. **Monitor system notices** for detailed error messages
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details
+1. Create a `definitions.py` file with your step definitions
+2. Add `callback` fields to each `StepDefinition`
+3. Reference your implementation functions in the callbacks
+4. Use `--config-root` instead of the old parameter

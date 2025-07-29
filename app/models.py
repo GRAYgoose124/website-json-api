@@ -44,6 +44,7 @@ class StepDefinition(BaseModel):
     id: str
     name: str
     description: str
+    callback: str
     params_schema: Dict[str, Any] = {}
     timeout_seconds: Optional[int] = None
     retry_count: int = 0
