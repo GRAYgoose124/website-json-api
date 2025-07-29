@@ -1,8 +1,8 @@
 import React from 'react';
-import { Clock, Activity, CheckCircle, AlertCircle, X } from 'lucide-react';
+import { Clock, Activity, CheckCircle, AlertCircle, X, ArrowRight } from 'lucide-react';
 import WorkflowChain from './WorkflowChain';
 
-const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
+const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating, dependencies }) => {
   const statusColors = {
     pending: 'text-gray-400 bg-gray-500/20',
     running: 'text-blue-400 bg-blue-500/20 animate-pulse',
@@ -25,6 +25,9 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
                         workflow.current_step ? workflow.definition.steps.findIndex(s => s.step_id === workflow.current_step) : 0;
   const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
 
+  // Get execution order from dependencies
+  const executionOrder = dependencies?.execution_order || workflow.definition.steps.map(s => s.step_id);
+
   return (
     <div className={`rounded-lg border transition-all duration-300 backdrop-blur-sm ${
       isSelected 
@@ -33,7 +36,7 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
     } ${workflow.status === 'running' && isAutoUpdating ? 'ring-1 ring-blue-500/30' : ''}`}>
       <div className="p-3">
         {/* Workflow Chain */}
-        <WorkflowChain workflow={workflow} isActive={workflow.status === 'running'} />
+        <WorkflowChain workflow={workflow} isActive={workflow.status === 'running'} dependencies={dependencies} />
         
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1 min-w-0">
@@ -73,6 +76,38 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating }) => {
                 {workflow.current_step.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Dependency Info */}
+        {dependencies && (
+          <div className="mb-2 p-1.5 bg-gray-800/50 border border-gray-700/50 rounded-md">
+            <div className="flex items-center gap-1.5 text-gray-400 text-xs mb-1">
+              <ArrowRight className="w-2.5 h-2.5" />
+              <span>Execution Order</span>
+            </div>
+            <div className="text-xs text-gray-300">
+              {executionOrder.slice(0, 3).map((stepId, idx) => (
+                <span key={stepId} className="inline-block bg-gray-700/50 px-1 py-0.5 rounded mr-1 mb-1">
+                  {stepId}
+                </span>
+              ))}
+              {executionOrder.length > 3 && (
+                <span className="text-gray-500">+{executionOrder.length - 3} more</span>
+              )}
+            </div>
+            
+            {/* Validation warnings */}
+            {(dependencies.cycles?.length > 0 || dependencies.missing_dependencies?.length > 0) && (
+              <div className="mt-1 pt-1 border-t border-gray-700">
+                {dependencies.cycles?.length > 0 && (
+                  <div className="text-red-400 text-xs">⚠️ Circular dependencies</div>
+                )}
+                {dependencies.missing_dependencies?.length > 0 && (
+                  <div className="text-yellow-400 text-xs">⚠️ Missing dependencies</div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

@@ -5,8 +5,8 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [params, setParams] = useState(step.params || {});
 
-  const schema = stepDefinition?.params_schema;
-  const properties = schema?.properties || {};
+  // Use io.inputs instead of params_schema
+  const inputs = stepDefinition?.io?.inputs || [];
 
   const handleParamChange = (key, value) => {
     const newParams = { ...params, [key]: value };
@@ -14,19 +14,19 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
     onUpdate(step.step_id, newParams);
   };
 
-  const renderParamInput = (key, prop) => {
-    const value = params[key] ?? prop.default;
+  const renderParamInput = (input) => {
+    const value = params[input.name] ?? input.default;
     
-    switch (prop.type) {
+    switch (input.type) {
       case 'string':
-        if (prop.enum) {
+        if (input.constraints?.enum) {
           return (
             <select
               value={value}
-              onChange={(e) => handleParamChange(key, e.target.value)}
+              onChange={(e) => handleParamChange(input.name, e.target.value)}
               className="w-full px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-xs"
             >
-              {prop.enum.map(option => (
+              {input.constraints.enum.map(option => (
                 <option key={option} value={option}>
                   {option.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </option>
@@ -38,21 +38,22 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
           <input
             type="text"
             value={value}
-            onChange={(e) => handleParamChange(key, e.target.value)}
-            placeholder={prop.description}
+            onChange={(e) => handleParamChange(input.name, e.target.value)}
+            placeholder={input.description}
             className="w-full px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-xs"
           />
         );
       
+      case 'float':
       case 'number':
         return (
           <input
             type="number"
             value={value}
-            min={prop.minimum}
-            max={prop.maximum}
+            min={input.constraints?.minimum}
+            max={input.constraints?.maximum}
             step="any"
-            onChange={(e) => handleParamChange(key, parseFloat(e.target.value))}
+            onChange={(e) => handleParamChange(input.name, parseFloat(e.target.value))}
             className="w-full px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-xs"
           />
         );
@@ -62,9 +63,9 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
           <input
             type="number"
             value={value}
-            min={prop.minimum}
-            max={prop.maximum}
-            onChange={(e) => handleParamChange(key, parseInt(e.target.value))}
+            min={input.constraints?.minimum}
+            max={input.constraints?.maximum}
+            onChange={(e) => handleParamChange(input.name, parseInt(e.target.value))}
             className="w-full px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-xs"
           />
         );
@@ -75,17 +76,17 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
             <input
               type="checkbox"
               checked={value}
-              onChange={(e) => handleParamChange(key, e.target.checked)}
+              onChange={(e) => handleParamChange(input.name, e.target.checked)}
               className="w-2.5 h-2.5 text-blue-500 bg-gray-800 border-gray-700 rounded focus:ring-blue-500 focus:ring-1"
             />
           </div>
         );
       
       case 'array':
-        if (prop.items?.enum) {
+        if (input.constraints?.items?.enum) {
           return (
             <div className="space-y-0.5">
-              {prop.items.enum.map(option => (
+              {input.constraints.items.enum.map(option => (
                 <label key={option} className="flex items-center space-x-1">
                   <input
                     type="checkbox"
@@ -95,7 +96,7 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
                       const newArray = e.target.checked
                         ? [...currentArray, option]
                         : currentArray.filter(item => item !== option);
-                      handleParamChange(key, newArray);
+                      handleParamChange(input.name, newArray);
                     }}
                     className="w-2.5 h-2.5 text-blue-500 bg-gray-800 border-gray-700 rounded focus:ring-blue-500 focus:ring-1"
                   />
@@ -111,7 +112,7 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
           <input
             type="text"
             value={Array.isArray(value) ? value.join(', ') : ''}
-            onChange={(e) => handleParamChange(key, e.target.value.split(',').map(s => s.trim()))}
+            onChange={(e) => handleParamChange(input.name, e.target.value.split(',').map(s => s.trim()))}
             placeholder="Comma-separated values"
             className="w-full px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-xs"
           />
@@ -122,7 +123,7 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
           <input
             type="text"
             value={value}
-            onChange={(e) => handleParamChange(key, e.target.value)}
+            onChange={(e) => handleParamChange(input.name, e.target.value)}
             className="w-full px-1.5 py-0.5 rounded bg-gray-800/50 border border-gray-700 focus:border-blue-500 focus:outline-none text-xs"
           />
         );
@@ -172,12 +173,16 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove }) => {
       
       {isExpanded && (
         <div className="border-t border-gray-700/50 p-1.5 space-y-1.5">
-          {Object.entries(properties).map(([key, prop]) => (
-            <div key={key} className="space-y-0.5">
+          {inputs.map((input) => (
+            <div key={input.name} className="space-y-0.5">
               <label className="block text-xs font-medium text-gray-300">
-                {prop.title || key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {input.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                {input.required && <span className="text-red-400 ml-1">*</span>}
               </label>
-              {renderParamInput(key, prop)}
+              {renderParamInput(input)}
+              {input.description && (
+                <p className="text-xs text-gray-400 mt-0.5">{input.description}</p>
+              )}
             </div>
           ))}
         </div>

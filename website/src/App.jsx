@@ -14,6 +14,7 @@ import StepConfiguration from './components/StepConfiguration';
 import Statistics from './components/Statistics';
 import ConnectionStatus from './components/ConnectionStatus';
 import LoadingSpinner from './components/LoadingSpinner';
+import StepDependencies from './components/StepDependencies';
 
 const API_BASE = 'http://localhost:8001';
 
@@ -33,6 +34,12 @@ export default function App() {
   const [lastWorkflowUpdate, setLastWorkflowUpdate] = useState(null);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState('workflows');
+  const [workflowDependencies, setWorkflowDependencies] = useState({});
+  const [stepCategories, setStepCategories] = useState([]);
+  const [stepTags, setStepTags] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [selectedTag, setSelectedTag] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
@@ -47,7 +54,9 @@ export default function App() {
         await Promise.all([
           fetchSteps(),
           fetchWorkflows(),
-          fetchNotices()
+          fetchNotices(),
+          fetchStepCategories(),
+          fetchStepTags()
         ]);
       } catch (error) {
         console.error('Failed to initialize app:', error);
@@ -87,6 +96,8 @@ export default function App() {
       const updatedWorkflow = workflows.find(w => w.id === selectedWorkflow.id);
       if (updatedWorkflow) {
         setSelectedWorkflow(updatedWorkflow);
+        // Fetch dependencies for the selected workflow
+        fetchWorkflowDependencies(updatedWorkflow.id);
       }
     }
   }, [workflows, selectedWorkflow]);
@@ -100,10 +111,34 @@ export default function App() {
         console.log('Fetched steps:', stepsData);
         setSteps(stepsData);
       } else {
-        console.error('Failed to fetch steps, status:', res.status);
+        console.error('Failed to fetch steps:', await res.text());
       }
     } catch (error) {
-      console.error('Failed to fetch steps:', error);
+      console.error('Error fetching steps:', error);
+    }
+  };
+
+  const fetchStepCategories = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/steps/categories`);
+      if (res.ok) {
+        const categories = await res.json();
+        setStepCategories(categories);
+      }
+    } catch (error) {
+      console.error('Error fetching step categories:', error);
+    }
+  };
+
+  const fetchStepTags = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/steps/tags`);
+      if (res.ok) {
+        const tags = await res.json();
+        setStepTags(tags);
+      }
+    } catch (error) {
+      console.error('Error fetching step tags:', error);
     }
   };
 
@@ -111,19 +146,29 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/workflows`);
       if (res.ok) {
-        const newWorkflows = await res.json();
-        setWorkflows(newWorkflows);
+        const workflowsData = await res.json();
+        setWorkflows(workflowsData);
         setLastWorkflowUpdate(new Date());
-        
-        if (selectedWorkflow) {
-          const updatedSelected = newWorkflows.find(w => w.id === selectedWorkflow.id);
-          if (updatedSelected) {
-            setSelectedWorkflow(updatedSelected);
-          }
-        }
+      } else {
+        console.error('Failed to fetch workflows:', await res.text());
       }
     } catch (error) {
-      console.error('Failed to fetch workflows:', error);
+      console.error('Error fetching workflows:', error);
+    }
+  };
+
+  const fetchWorkflowDependencies = async (workflowId) => {
+    try {
+      const res = await fetch(`${API_BASE}/workflows/${workflowId}/dependencies`);
+      if (res.ok) {
+        const dependencies = await res.json();
+        setWorkflowDependencies(prev => ({
+          ...prev,
+          [workflowId]: dependencies
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching workflow dependencies:', error);
     }
   };
 
@@ -131,27 +176,26 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/notices`);
       if (res.ok) {
-        setNotices(await res.json());
+        const noticesData = await res.json();
+        setNotices(noticesData);
+      } else {
+        console.error('Failed to fetch notices:', await res.text());
       }
     } catch (error) {
-      console.error('Failed to fetch notices:', error);
+      console.error('Error fetching notices:', error);
     }
   };
 
-  const connectWebSocket = useCallback(() => {
+  const connectWebSocket = () => {
     try {
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
-
       wsRef.current = new WebSocket(`ws://localhost:8001/ws/notices`);
       
       wsRef.current.onopen = () => {
+        console.log('WebSocket connected');
         setIsConnected(true);
         setIsReconnecting(false);
         setConnectionError('');
         reconnectAttemptsRef.current = 0;
-        console.log('WebSocket connected');
       };
       
       wsRef.current.onmessage = (event) => {
@@ -160,41 +204,39 @@ export default function App() {
           if (data.type === 'ping') return;
           
           setNotices(prev => [data, ...prev]);
-          
-          if (data.workflow_id) {
-            fetchWorkflows();
-          }
         } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+          console.error('Error parsing WebSocket message:', error);
         }
       };
       
-      wsRef.current.onclose = (event) => {
+      wsRef.current.onclose = () => {
+        console.log('WebSocket disconnected');
         setIsConnected(false);
-        console.log('WebSocket disconnected', event.code, event.reason);
         
-        if (event.code !== 1000 && reconnectAttemptsRef.current < maxReconnectAttempts) {
+        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
           setIsReconnecting(true);
           reconnectAttemptsRef.current++;
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
-          reconnectTimeoutRef.current = setTimeout(connectWebSocket, delay);
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current - 1), 30000);
+          
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log(`Attempting to reconnect (${reconnectAttemptsRef.current}/${maxReconnectAttempts})`);
+            connectWebSocket();
+          }, delay);
         } else {
-          setIsReconnecting(false);
-          setConnectionError('Connection lost. Please refresh the page.');
+          setConnectionError('Failed to reconnect after multiple attempts');
         }
       };
       
       wsRef.current.onerror = (error) => {
-        setIsConnected(false);
-        setConnectionError('WebSocket connection failed');
         console.error('WebSocket error:', error);
+        setConnectionError('WebSocket connection error');
       };
+      
     } catch (error) {
-      setIsConnected(false);
+      console.error('Error creating WebSocket:', error);
       setConnectionError('Failed to create WebSocket connection');
-      console.error('WebSocket connection error:', error);
     }
-  }, []);
+  };
 
   const dismissNotice = async (id) => {
     try {
@@ -227,7 +269,22 @@ export default function App() {
         setSelectedSteps([]);
         await fetchWorkflows();
       } else {
-        console.error('Failed to create workflow:', await res.text());
+        const errorData = await res.json();
+        console.error('Failed to create workflow:', errorData);
+        // Show validation errors in notices
+        if (errorData.errors) {
+          errorData.errors.forEach(error => {
+            setNotices(prev => [{
+              id: Date.now().toString(),
+              type: 'error',
+              severity: 50,
+              title: 'Workflow Validation Error',
+              message: error,
+              timestamp: new Date().toISOString(),
+              dismissible: true
+            }, ...prev]);
+          });
+        }
       }
     } catch (error) {
       console.error('Failed to create workflow:', error);
@@ -256,6 +313,35 @@ export default function App() {
 
   const removeStep = (stepId) => {
     setSelectedSteps(prev => prev.filter(s => s.step_id !== stepId));
+  };
+
+  const filteredSteps = () => {
+    let filtered = steps;
+    
+    if (selectedCategory) {
+      filtered = Object.fromEntries(
+        Object.entries(steps).filter(([_, step]) => step.category === selectedCategory)
+      );
+    }
+    
+    if (selectedTag) {
+      filtered = Object.fromEntries(
+        Object.entries(filtered).filter(([_, step]) => step.tags.includes(selectedTag))
+      );
+    }
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = Object.fromEntries(
+        Object.entries(filtered).filter(([_, step]) => 
+          step.name.toLowerCase().includes(query) ||
+          step.description.toLowerCase().includes(query) ||
+          step.tags.some(tag => tag.toLowerCase().includes(query))
+        )
+      );
+    }
+    
+    return filtered;
   };
 
   if (isLoading) {
@@ -325,14 +411,53 @@ export default function App() {
                   />
                 </div>
                 
+                {/* Step Filtering */}
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="flex-1 px-2 py-1.5 rounded-md bg-gray-900/50 border border-gray-700 focus:border-blue-500 focus:outline-none transition-colors text-xs"
+                    >
+                      <option value="">All Categories</option>
+                      {stepCategories.map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                    
+                    <select
+                      value={selectedTag}
+                      onChange={(e) => setSelectedTag(e.target.value)}
+                      className="flex-1 px-2 py-1.5 rounded-md bg-gray-900/50 border border-gray-700 focus:border-blue-500 focus:outline-none transition-colors text-xs"
+                    >
+                      <option value="">All Tags</option>
+                      {stepTags.map(tag => (
+                        <option key={tag} value={tag}>{tag}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <input
+                    type="text"
+                    placeholder="Search steps..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-2 py-1.5 rounded-md bg-gray-900/50 border border-gray-700 focus:border-blue-500 focus:outline-none transition-colors text-xs"
+                  />
+                </div>
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Select Steps ({selectedSteps.length} selected, {Object.keys(steps).length} available)
+                    Select Steps ({selectedSteps.length} selected, {Object.keys(filteredSteps()).length} available)
                     {Object.keys(steps).length === 0 && (
                       <span className="text-xs text-yellow-400 ml-2">Loading...</span>
                     )}
                   </label>
-                  <StepSelector steps={steps} selectedSteps={selectedSteps} onStepToggle={toggleStep} />
+                  <StepSelector 
+                    steps={filteredSteps()} 
+                    selectedSteps={selectedSteps} 
+                    onStepToggle={toggleStep} 
+                  />
                 </div>
                 
                 <button
@@ -478,6 +603,7 @@ export default function App() {
                       onSelect={setSelectedWorkflow}
                       isSelected={selectedWorkflow?.id === workflow.id}
                       isAutoUpdating={!!workflowPollingRef.current && autoUpdateEnabled}
+                      dependencies={workflowDependencies[workflow.id]}
                     />
                   ))
                 )}
@@ -504,6 +630,17 @@ export default function App() {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Notices */}
+        <div className="fixed bottom-4 right-4 space-y-2 z-50 max-w-sm">
+          {notices.slice(0, 3).map(notice => (
+            <Notice
+              key={notice.id}
+              notice={notice}
+              onDismiss={() => dismissNotice(notice.id)}
+            />
+          ))}
         </div>
       </div>
     </div>

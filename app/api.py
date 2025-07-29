@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Query
 from typing import List, Optional, Dict
 from datetime import datetime
 import asyncio
 
-from .models import Notice, NoticeType, WorkflowStatus, WorkflowDefinition, WorkflowInstance, StepDefinition
+from .models import Notice, NoticeType, WorkflowStatus, WorkflowDefinition, WorkflowInstance, StepDefinition, DependencyResolution
 from .core import notice_manager, step_registry, workflow_engine
+from .step_loader import StepLoader
 
 # Create FastAPI app
 app = FastAPI(title="Scientific Workflow API")
@@ -19,6 +20,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize step loader
+step_loader = StepLoader()
+
 # API Endpoints
 @app.get("/notices", response_model=List[Notice])
 async def get_notices(
@@ -29,23 +33,97 @@ async def get_notices(
     return notice_manager.get_notices(workflow_id, notice_type, since)
 
 @app.get("/steps", response_model=Dict[str, StepDefinition])
-async def get_available_steps():
-    return step_registry.definitions
+async def get_available_steps(
+    category: Optional[str] = Query(None, description="Filter by category"),
+    tag: Optional[str] = Query(None, description="Filter by tag"),
+    search: Optional[str] = Query(None, description="Search in name, description, or tags")
+):
+    """Get available steps with optional filtering"""
+    if category:
+        return step_loader.get_steps_by_category(category)
+    elif tag:
+        return step_loader.get_steps_by_tag(tag)
+    elif search:
+        return step_loader.search_steps(search)
+    else:
+        return step_registry.definitions
+
+@app.get("/steps/categories")
+async def get_step_categories():
+    """Get all available step categories"""
+    categories = set()
+    for definition in step_registry.definitions.values():
+        if definition.category:
+            categories.add(definition.category)
+    return list(categories)
+
+@app.get("/steps/tags")
+async def get_step_tags():
+    """Get all available step tags"""
+    tags = set()
+    for definition in step_registry.definitions.values():
+        tags.update(definition.tags)
+    return list(tags)
 
 @app.post("/workflows", response_model=WorkflowInstance)
 async def create_workflow(definition: WorkflowDefinition, background_tasks: BackgroundTasks):
+    # Validate workflow before creating
+    errors, warnings = step_registry.validate_workflow(WorkflowInstance(definition=definition))
+    
+    if errors:
+        raise HTTPException(status_code=400, detail={
+            "message": "Workflow validation failed",
+            "errors": errors,
+            "warnings": warnings
+        })
+    
     workflow = WorkflowInstance(definition=definition)
     workflow_engine.workflows[workflow.id] = workflow
+    
+    # Add validation results to workflow
+    workflow.definition.validation_errors = errors
+    workflow.definition.validation_warnings = warnings
     
     background_tasks.add_task(workflow_engine.execute_workflow, workflow)
     
     return workflow
+
+@app.post("/workflows/validate")
+async def validate_workflow(definition: WorkflowDefinition):
+    """Validate a workflow definition without creating it"""
+    errors, warnings = step_registry.validate_workflow(WorkflowInstance(definition=definition))
+    
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings
+    }
+
+@app.post("/workflows/resolve-dependencies")
+async def resolve_workflow_dependencies(definition: WorkflowDefinition):
+    """Resolve dependencies for a workflow definition"""
+    workflow = WorkflowInstance(definition=definition)
+    resolution = step_registry.resolve_dependencies(workflow)
+    
+    return resolution
 
 @app.get("/workflows/{workflow_id}", response_model=WorkflowInstance)
 async def get_workflow(workflow_id: str):
     if workflow_id not in workflow_engine.workflows:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return workflow_engine.workflows[workflow_id]
+
+@app.get("/workflows/{workflow_id}/dependencies", response_model=DependencyResolution)
+async def get_workflow_dependencies(workflow_id: str):
+    """Get dependency resolution for a workflow"""
+    if workflow_id not in workflow_engine.workflows:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    
+    resolution = workflow_engine.get_workflow_dependencies(workflow_id)
+    if not resolution:
+        raise HTTPException(status_code=404, detail="Dependency resolution not found")
+    
+    return resolution
 
 @app.get("/workflows", response_model=List[WorkflowInstance])
 async def list_workflows(status: Optional[WorkflowStatus] = None):

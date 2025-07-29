@@ -1,4 +1,4 @@
-from app.models import StepDefinition
+from app.models import StepDefinition, StepIO, IOSchema, DataType
 
 
 STEP_DEFINITIONS = {
@@ -7,355 +7,518 @@ STEP_DEFINITIONS = {
             name="Data Validation",
             description="Validates input data format and constraints",
             callback="steps.validate_data",
-            params_schema={
-                "type": "object",
-                "properties": {
-                    "data_path": {
-                        "type": "string",
-                        "title": "Data Path",
-                        "description": "Path to the data file to validate",
-                        "default": "/data/input.csv"
-                    },
-                    "validation_type": {
-                        "type": "string",
-                        "title": "Validation Type",
-                        "description": "Type of validation to perform",
-                        "enum": ["schema", "format", "completeness", "all"],
-                        "default": "all"
-                    },
-                    "strict_mode": {
-                        "type": "boolean",
-                        "title": "Strict Mode",
-                        "description": "Enable strict validation rules",
-                        "default": False
-                    },
-                    "max_errors": {
-                        "type": "integer",
-                        "title": "Max Errors",
-                        "description": "Maximum number of errors to report",
-                        "minimum": 1,
-                        "maximum": 1000,
-                        "default": 100
-                    }
-                },
-                "required": ["data_path"]
-            }
+            category="data_processing",
+            tags=["data", "validation"],
+            io=StepIO(
+                inputs=[
+                    IOSchema(
+                        name="data_path",
+                        type=DataType.STRING,
+                        description="Path to the data file to validate",
+                        required=True,
+                        default="/data/input.csv"
+                    ),
+                    IOSchema(
+                        name="validation_type",
+                        type=DataType.STRING,
+                        description="Type of validation to perform",
+                        required=False,
+                        default="all",
+                        constraints={"enum": ["schema", "format", "completeness", "all"]}
+                    ),
+                    IOSchema(
+                        name="strict_mode",
+                        type=DataType.BOOLEAN,
+                        description="Enable strict validation rules",
+                        required=False,
+                        default=False
+                    ),
+                    IOSchema(
+                        name="max_errors",
+                        type=DataType.INTEGER,
+                        description="Maximum number of errors to report",
+                        required=False,
+                        default=100,
+                        constraints={"minimum": 1, "maximum": 1000}
+                    )
+                ],
+                outputs=[
+                    IOSchema(
+                        name="validation_result",
+                        type=DataType.JSON,
+                        description="Validation results and statistics",
+                        required=True
+                    )
+                ],
+                context_keys=["validation_result"]
+            )
         ),
         "data_processing": StepDefinition(
             id="data_processing",
             name="Data Processing",
             description="Processes validated data",
             callback="steps.process_data",
-            params_schema={
-                "type": "object",
-                "properties": {
-                    "algorithm": {
-                        "type": "string",
-                        "title": "Processing Algorithm",
-                        "description": "Algorithm to use for data processing",
-                        "enum": ["standard", "advanced", "ml_optimized", "custom"],
-                        "default": "standard"
-                    },
-                    "batch_size": {
-                        "type": "integer",
-                        "title": "Batch Size",
-                        "description": "Number of records to process in each batch",
-                        "minimum": 100,
-                        "maximum": 10000,
-                        "default": 1000
-                    },
-                    "parallel_processing": {
-                        "type": "boolean",
-                        "title": "Parallel Processing",
-                        "description": "Enable parallel processing for faster execution",
-                        "default": True
-                    },
-                    "output_format": {
-                        "type": "string",
-                        "title": "Output Format",
-                        "description": "Format for processed data output",
-                        "enum": ["csv", "json", "parquet", "hdf5"],
-                        "default": "csv"
-                    }
-                },
-                "required": ["algorithm"]
-            }
+            category="data_processing",
+            tags=["data", "processing"],
+            io=StepIO(
+                inputs=[
+                    IOSchema(
+                        name="validation_result",
+                        type=DataType.JSON,
+                        description="Validation results from data validation step",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="algorithm",
+                        type=DataType.STRING,
+                        description="Processing algorithm to use",
+                        required=True,
+                        default="standard",
+                        constraints={"enum": ["standard", "advanced", "ml_optimized", "custom"]}
+                    ),
+                    IOSchema(
+                        name="batch_size",
+                        type=DataType.INTEGER,
+                        description="Number of records to process in each batch",
+                        required=False,
+                        default=1000,
+                        constraints={"minimum": 100, "maximum": 10000}
+                    ),
+                    IOSchema(
+                        name="parallel_processing",
+                        type=DataType.BOOLEAN,
+                        description="Enable parallel processing for faster execution",
+                        required=False,
+                        default=True
+                    ),
+                    IOSchema(
+                        name="output_format",
+                        type=DataType.STRING,
+                        description="Format for processed data output",
+                        required=False,
+                        default="csv",
+                        constraints={"enum": ["csv", "json", "parquet", "hdf5"]}
+                    )
+                ],
+                outputs=[
+                    IOSchema(
+                        name="processed_data",
+                        type=DataType.DATASET,
+                        description="Processed dataset",
+                        required=True
+                    )
+                ],
+                context_keys=["processed_data"]
+            )
         ),
         "model_training": StepDefinition(
             id="model_training",
             name="Model Training",
             description="Trains machine learning models on processed data",
             callback="steps.train_model",
-            params_schema={
-                "type": "object",
-                "properties": {
-                    "model_type": {
-                        "type": "string",
-                        "title": "Model Type",
-                        "description": "Type of machine learning model to train",
-                        "enum": ["neural_network", "random_forest", "svm", "linear_regression", "xgboost"],
-                        "default": "neural_network"
-                    },
-                    "epochs": {
-                        "type": "integer",
-                        "title": "Training Epochs",
-                        "description": "Number of training epochs",
-                        "minimum": 1,
-                        "maximum": 1000,
-                        "default": 100
-                    },
-                    "learning_rate": {
-                        "type": "number",
-                        "title": "Learning Rate",
-                        "description": "Learning rate for training",
-                        "minimum": 0.0001,
-                        "maximum": 1.0,
-                        "default": 0.001
-                    },
-                    "validation_split": {
-                        "type": "number",
-                        "title": "Validation Split",
-                        "description": "Fraction of data to use for validation",
-                        "minimum": 0.1,
-                        "maximum": 0.5,
-                        "default": 0.2
-                    },
-                    "early_stopping": {
-                        "type": "boolean",
-                        "title": "Early Stopping",
-                        "description": "Enable early stopping to prevent overfitting",
-                        "default": True
-                    }
-                },
-                "required": ["model_type"]
-            }
+            category="ml",
+            tags=["ml", "training"],
+            io=StepIO(
+                inputs=[
+                    IOSchema(
+                        name="processed_data",
+                        type=DataType.DATASET,
+                        description="Processed dataset for training",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="model_type",
+                        type=DataType.STRING,
+                        description="Type of model to train",
+                        required=True,
+                        default="neural_network",
+                        constraints={"enum": ["neural_network", "random_forest", "svm", "linear_regression", "xgboost"]}
+                    ),
+                    IOSchema(
+                        name="epochs",
+                        type=DataType.INTEGER,
+                        description="Number of training epochs",
+                        required=False,
+                        default=100,
+                        constraints={"minimum": 1, "maximum": 1000}
+                    ),
+                    IOSchema(
+                        name="learning_rate",
+                        type=DataType.FLOAT,
+                        description="Learning rate for training",
+                        required=False,
+                        default=0.001,
+                        constraints={"minimum": 0.0001, "maximum": 1.0}
+                    ),
+                    IOSchema(
+                        name="validation_split",
+                        type=DataType.FLOAT,
+                        description="Fraction of data to use for validation",
+                        required=False,
+                        default=0.2,
+                        constraints={"minimum": 0.1, "maximum": 0.5}
+                    ),
+                    IOSchema(
+                        name="early_stopping",
+                        type=DataType.BOOLEAN,
+                        description="Enable early stopping to prevent overfitting",
+                        required=False,
+                        default=True
+                    )
+                ],
+                outputs=[
+                    IOSchema(
+                        name="trained_model",
+                        type=DataType.MODEL,
+                        description="Trained machine learning model",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="training_metrics",
+                        type=DataType.JSON,
+                        description="Training metrics and performance",
+                        required=True
+                    )
+                ],
+                context_keys=["trained_model", "training_metrics"]
+            )
         ),
         "result_analysis": StepDefinition(
             id="result_analysis",
             name="Result Analysis",
             description="Analyzes model results and generates reports",
             callback="steps.analyze_results",
-            params_schema={
-                "type": "object",
-                "properties": {
-                    "analysis_type": {
-                        "type": "string",
-                        "title": "Analysis Type",
-                        "description": "Type of analysis to perform",
-                        "enum": ["comprehensive", "performance", "feature_importance", "error_analysis", "custom"],
-                        "default": "comprehensive"
-                    },
-                    "output_format": {
-                        "type": "string",
-                        "title": "Output Format",
-                        "description": "Format for analysis reports",
-                        "enum": ["pdf", "html", "markdown", "json"],
-                        "default": "pdf"
-                    },
-                    "include_visualizations": {
-                        "type": "boolean",
-                        "title": "Include Visualizations",
-                        "description": "Generate charts and graphs in the report",
-                        "default": True
-                    },
-                    "confidence_level": {
-                        "type": "number",
-                        "title": "Confidence Level",
-                        "description": "Confidence level for statistical analysis",
-                        "minimum": 0.8,
-                        "maximum": 0.99,
-                        "default": 0.95
-                    }
-                },
-                "required": ["analysis_type"]
-            }
+            category="visualization",
+            tags=["analysis", "visualization"],
+            io=StepIO(
+                inputs=[
+                    IOSchema(
+                        name="trained_model",
+                        type=DataType.MODEL,
+                        description="Trained model for analysis",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="training_metrics",
+                        type=DataType.JSON,
+                        description="Training metrics for analysis",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="analysis_type",
+                        type=DataType.STRING,
+                        description="Type of analysis to perform",
+                        required=True,
+                        default="comprehensive",
+                        constraints={"enum": ["comprehensive", "performance", "feature_importance", "error_analysis", "custom"]}
+                    ),
+                    IOSchema(
+                        name="output_format",
+                        type=DataType.STRING,
+                        description="Format for analysis reports",
+                        required=False,
+                        default="pdf",
+                        constraints={"enum": ["pdf", "html", "markdown", "json"]}
+                    ),
+                    IOSchema(
+                        name="include_visualizations",
+                        type=DataType.BOOLEAN,
+                        description="Generate charts and graphs in the report",
+                        required=False,
+                        default=True
+                    ),
+                    IOSchema(
+                        name="confidence_level",
+                        type=DataType.FLOAT,
+                        description="Confidence level for statistical analysis",
+                        required=False,
+                        default=0.95,
+                        constraints={"minimum": 0.8, "maximum": 0.99}
+                    )
+                ],
+                outputs=[
+                    IOSchema(
+                        name="analysis_report",
+                        type=DataType.FILE,
+                        description="Generated analysis report",
+                        required=True,
+                        format="pdf"
+                    )
+                ],
+                context_keys=["analysis_report"]
+            )
         ),
         "data_cleaning": StepDefinition(
             id="data_cleaning",
             name="Data Cleaning",
             description="Cleans and preprocesses raw data",
             callback="steps.clean_data",
-            params_schema={
-                "type": "object",
-                "properties": {
-                    "cleaning_method": {
-                        "type": "string",
-                        "title": "Cleaning Method",
-                        "description": "Method to use for data cleaning",
-                        "enum": ["standard", "aggressive", "conservative", "custom"],
-                        "default": "standard"
-                    },
-                    "remove_duplicates": {
-                        "type": "boolean",
-                        "title": "Remove Duplicates",
-                        "description": "Remove duplicate records from the dataset",
-                        "default": True
-                    },
-                    "handle_missing": {
-                        "type": "string",
-                        "title": "Handle Missing Values",
-                        "description": "Strategy for handling missing values",
-                        "enum": ["drop", "impute_mean", "impute_median", "forward_fill"],
-                        "default": "impute_mean"
-                    },
-                    "outlier_threshold": {
-                        "type": "number",
-                        "title": "Outlier Threshold",
-                        "description": "Threshold for outlier detection (standard deviations)",
-                        "minimum": 1.0,
-                        "maximum": 5.0,
-                        "default": 3.0
-                    },
-                    "normalize_data": {
-                        "type": "boolean",
-                        "title": "Normalize Data",
-                        "description": "Apply data normalization",
-                        "default": True
-                    }
-                },
-                "required": ["cleaning_method"]
-            }
+            category="data_processing",
+            tags=["data", "cleaning"],
+            io=StepIO(
+                inputs=[
+                    IOSchema(
+                        name="raw_data",
+                        type=DataType.DATASET,
+                        description="Raw dataset to clean",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="cleaning_method",
+                        type=DataType.STRING,
+                        description="Method to use for data cleaning",
+                        required=True,
+                        default="standard",
+                        constraints={"enum": ["standard", "aggressive", "conservative", "custom"]}
+                    ),
+                    IOSchema(
+                        name="remove_duplicates",
+                        type=DataType.BOOLEAN,
+                        description="Remove duplicate records from the dataset",
+                        required=False,
+                        default=True
+                    ),
+                    IOSchema(
+                        name="handle_missing",
+                        type=DataType.STRING,
+                        description="Strategy for handling missing values",
+                        required=False,
+                        default="impute_mean",
+                        constraints={"enum": ["drop", "impute_mean", "impute_median", "forward_fill"]}
+                    ),
+                    IOSchema(
+                        name="outlier_threshold",
+                        type=DataType.FLOAT,
+                        description="Threshold for outlier detection (standard deviations)",
+                        required=False,
+                        default=3.0,
+                        constraints={"minimum": 1.0, "maximum": 5.0}
+                    ),
+                    IOSchema(
+                        name="normalize_data",
+                        type=DataType.BOOLEAN,
+                        description="Apply data normalization",
+                        required=False,
+                        default=True
+                    )
+                ],
+                outputs=[
+                    IOSchema(
+                        name="cleaned_data",
+                        type=DataType.DATASET,
+                        description="Cleaned and preprocessed dataset",
+                        required=True
+                    )
+                ],
+                context_keys=["cleaned_data"]
+            )
         ),
         "feature_engineering": StepDefinition(
             id="feature_engineering",
             name="Feature Engineering",
             description="Creates and selects features for machine learning",
             callback="steps.engineer_features",
-            params_schema={
-                "type": "object",
-                "properties": {
-                    "feature_selection": {
-                        "type": "string",
-                        "title": "Feature Selection Method",
-                        "description": "Method for feature selection",
-                        "enum": ["correlation", "mutual_info", "lasso", "recursive", "all"],
-                        "default": "correlation"
-                    },
-                    "create_interactions": {
-                        "type": "boolean",
-                        "title": "Create Interactions",
-                        "description": "Create interaction features between variables",
-                        "default": True
-                    },
-                    "polynomial_features": {
-                        "type": "integer",
-                        "title": "Polynomial Degree",
-                        "description": "Degree of polynomial features to create",
-                        "minimum": 1,
-                        "maximum": 3,
-                        "default": 2
-                    },
-                    "feature_scaling": {
-                        "type": "string",
-                        "title": "Feature Scaling",
-                        "description": "Method for feature scaling",
-                        "enum": ["standard", "minmax", "robust", "none"],
-                        "default": "standard"
-                    },
-                    "max_features": {
-                        "type": "integer",
-                        "title": "Max Features",
-                        "description": "Maximum number of features to select",
-                        "minimum": 5,
-                        "maximum": 100,
-                        "default": 20
-                    }
-                },
-                "required": ["feature_selection"]
-            }
+            category="ml",
+            tags=["ml", "features"],
+            io=StepIO(
+                inputs=[
+                    IOSchema(
+                        name="cleaned_data",
+                        type=DataType.DATASET,
+                        description="Cleaned dataset for feature engineering",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="feature_selection",
+                        type=DataType.STRING,
+                        description="Method for feature selection",
+                        required=True,
+                        default="correlation",
+                        constraints={"enum": ["correlation", "mutual_info", "lasso", "recursive", "all"]}
+                    ),
+                    IOSchema(
+                        name="create_interactions",
+                        type=DataType.BOOLEAN,
+                        description="Create interaction features between variables",
+                        required=False,
+                        default=True
+                    ),
+                    IOSchema(
+                        name="polynomial_features",
+                        type=DataType.INTEGER,
+                        description="Degree of polynomial features to create",
+                        required=False,
+                        default=2,
+                        constraints={"minimum": 1, "maximum": 3}
+                    ),
+                    IOSchema(
+                        name="feature_scaling",
+                        type=DataType.STRING,
+                        description="Method for feature scaling",
+                        required=False,
+                        default="standard",
+                        constraints={"enum": ["standard", "minmax", "robust", "none"]}
+                    ),
+                    IOSchema(
+                        name="max_features",
+                        type=DataType.INTEGER,
+                        description="Maximum number of features to select",
+                        required=False,
+                        default=20,
+                        constraints={"minimum": 5, "maximum": 100}
+                    )
+                ],
+                outputs=[
+                    IOSchema(
+                        name="engineered_features",
+                        type=DataType.DATASET,
+                        description="Dataset with engineered features",
+                        required=True
+                    )
+                ],
+                context_keys=["engineered_features"]
+            )
         ),
         "model_evaluation": StepDefinition(
             id="model_evaluation",
             name="Model Evaluation",
             description="Evaluates model performance using various metrics",
             callback="steps.evaluate_model",
-            params_schema={
-                "type": "object",
-                "properties": {
-                    "metrics": {
-                        "type": "array",
-                        "title": "Evaluation Metrics",
-                        "description": "Metrics to use for model evaluation",
-                        "items": {
-                            "type": "string",
-                            "enum": ["accuracy", "precision", "recall", "f1", "auc", "mae", "rmse"]
-                        },
-                        "default": ["accuracy", "precision", "recall", "f1"]
-                    },
-                    "cross_validation": {
-                        "type": "boolean",
-                        "title": "Cross Validation",
-                        "description": "Use cross-validation for evaluation",
-                        "default": True
-                    },
-                    "cv_folds": {
-                        "type": "integer",
-                        "title": "Cross Validation Folds",
-                        "description": "Number of folds for cross-validation",
-                        "minimum": 3,
-                        "maximum": 10,
-                        "default": 5
-                    },
-                    "test_size": {
-                        "type": "number",
-                        "title": "Test Set Size",
-                        "description": "Fraction of data to use for testing",
-                        "minimum": 0.1,
-                        "maximum": 0.5,
-                        "default": 0.2
-                    },
-                    "stratified_sampling": {
-                        "type": "boolean",
-                        "title": "Stratified Sampling",
-                        "description": "Use stratified sampling for test set",
-                        "default": True
-                    }
-                },
-                "required": ["metrics"]
-            }
+            category="ml",
+            tags=["ml", "evaluation"],
+            io=StepIO(
+                inputs=[
+                    IOSchema(
+                        name="trained_model",
+                        type=DataType.MODEL,
+                        description="Trained model to evaluate",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="engineered_features",
+                        type=DataType.DATASET,
+                        description="Dataset with features for evaluation",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="metrics",
+                        type=DataType.ARRAY,
+                        description="Metrics to use for model evaluation",
+                        required=True,
+                        default=["accuracy", "precision", "recall", "f1"],
+                        constraints={"items": {"enum": ["accuracy", "precision", "recall", "f1", "auc", "mae", "rmse"]}}
+                    ),
+                    IOSchema(
+                        name="cross_validation",
+                        type=DataType.BOOLEAN,
+                        description="Use cross-validation for evaluation",
+                        required=False,
+                        default=True
+                    ),
+                    IOSchema(
+                        name="cv_folds",
+                        type=DataType.INTEGER,
+                        description="Number of folds for cross-validation",
+                        required=False,
+                        default=5,
+                        constraints={"minimum": 3, "maximum": 10}
+                    ),
+                    IOSchema(
+                        name="test_size",
+                        type=DataType.FLOAT,
+                        description="Fraction of data to use for testing",
+                        required=False,
+                        default=0.2,
+                        constraints={"minimum": 0.1, "maximum": 0.5}
+                    ),
+                    IOSchema(
+                        name="stratified_sampling",
+                        type=DataType.BOOLEAN,
+                        description="Use stratified sampling for test set",
+                        required=False,
+                        default=True
+                    )
+                ],
+                outputs=[
+                    IOSchema(
+                        name="evaluation_results",
+                        type=DataType.JSON,
+                        description="Model evaluation results and metrics",
+                        required=True
+                    )
+                ],
+                context_keys=["evaluation_results"]
+            )
         ),
         "deployment_prep": StepDefinition(
             id="deployment_prep",
             name="Deployment Preparation",
             description="Prepares model for production deployment",
             callback="steps.prepare_deployment",
-            params_schema={
-                "type": "object",
-                "properties": {
-                    "deployment_type": {
-                        "type": "string",
-                        "title": "Deployment Type",
-                        "description": "Type of deployment to prepare",
-                        "enum": ["rest_api", "batch_processing", "streaming", "edge", "cloud"],
-                        "default": "rest_api"
-                    },
-                    "api_format": {
-                        "type": "string",
-                        "title": "API Format",
-                        "description": "Format for the API interface",
-                        "enum": ["json", "protobuf", "graphql", "grpc"],
-                        "default": "json"
-                    },
-                    "containerization": {
-                        "type": "boolean",
-                        "title": "Containerization",
-                        "description": "Create Docker container for deployment",
-                        "default": True
-                    },
-                    "health_checks": {
-                        "type": "boolean",
-                        "title": "Health Checks",
-                        "description": "Include health check endpoints",
-                        "default": True
-                    },
-                    "monitoring": {
-                        "type": "boolean",
-                        "title": "Monitoring",
-                        "description": "Include monitoring and logging",
-                        "default": True
-                    }
-                },
-                "required": ["deployment_type"]
-            }
+            category="deployment",
+            tags=["deployment", "production"],
+            io=StepIO(
+                inputs=[
+                    IOSchema(
+                        name="trained_model",
+                        type=DataType.MODEL,
+                        description="Trained model for deployment",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="evaluation_results",
+                        type=DataType.JSON,
+                        description="Model evaluation results",
+                        required=True
+                    ),
+                    IOSchema(
+                        name="deployment_type",
+                        type=DataType.STRING,
+                        description="Type of deployment to prepare",
+                        required=True,
+                        default="rest_api",
+                        constraints={"enum": ["rest_api", "batch_processing", "streaming", "edge", "cloud"]}
+                    ),
+                    IOSchema(
+                        name="api_format",
+                        type=DataType.STRING,
+                        description="Format for the API interface",
+                        required=False,
+                        default="json",
+                        constraints={"enum": ["json", "protobuf", "graphql", "grpc"]}
+                    ),
+                    IOSchema(
+                        name="containerization",
+                        type=DataType.BOOLEAN,
+                        description="Create Docker container for deployment",
+                        required=False,
+                        default=True
+                    ),
+                    IOSchema(
+                        name="health_checks",
+                        type=DataType.BOOLEAN,
+                        description="Include health check endpoints",
+                        required=False,
+                        default=True
+                    ),
+                    IOSchema(
+                        name="monitoring",
+                        type=DataType.BOOLEAN,
+                        description="Include monitoring and logging",
+                        required=False,
+                        default=True
+                    )
+                ],
+                outputs=[
+                    IOSchema(
+                        name="deployment_package",
+                        type=DataType.FILE,
+                        description="Deployment package ready for production",
+                        required=True,
+                        format="tar.gz"
+                    )
+                ],
+                context_keys=["deployment_package"]
+            )
         )
-    }
+}
