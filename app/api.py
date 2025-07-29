@@ -27,10 +27,6 @@ app.add_middleware(
 # Initialize step loader
 step_loader = StepLoader()
 
-# Create uploads directory
-UPLOADS_DIR = Path("./uploads")
-UPLOADS_DIR.mkdir(exist_ok=True)
-
 # Initialize dependency resolver
 @app.on_event("startup")
 async def startup_event():
@@ -42,10 +38,14 @@ async def startup_event():
 async def upload_file(file: UploadFile = File(...)):
     """Upload a file and return the file path"""
     try:
+        # Get uploads directory from app state
+        uploads_dir = getattr(app.state, 'uploads_dir', Path("./uploads"))
+        uploads_dir.mkdir(exist_ok=True)
+        
         # Create a unique filename to avoid conflicts
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         filename = f"{timestamp}_{file.filename}"
-        file_path = UPLOADS_DIR / filename
+        file_path = uploads_dir / filename
         
         # Save the uploaded file
         with open(file_path, "wb") as buffer:

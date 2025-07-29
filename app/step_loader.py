@@ -77,8 +77,8 @@ class StepLoader:
         self._function_implementations = {}
         
         for py_file in root_path.glob("*.py"):
-            if py_file.name == "definitions.py":
-                continue  # Already loaded
+            if py_file.name in ["definitions.py", "__init__.py"]:
+                continue  # Skip definitions.py (already loaded) and __init__.py
                 
             try:
                 # Load the module

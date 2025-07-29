@@ -5,32 +5,37 @@ Test script for dependency resolution system
 import asyncio
 import sys
 import os
+import pytest
+from pathlib import Path
 
-# Add the app directory to the path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
+# Add the project root to the path
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.models import WorkflowDefinition, WorkflowStep, WorkflowInstance
 from app.dependency_resolver import DependencyResolver
-from app.example_steps import EXAMPLE_STEP_DEFINITIONS
+from app.step_loader import StepLoader
 
 def test_dependency_resolution():
-    """Test the dependency resolution system"""
+    """Test the dependency resolution system with actual step definitions"""
     print("🧪 Testing Dependency Resolution System")
     print("=" * 50)
     
-    # Create dependency resolver with example steps
-    resolver = DependencyResolver(EXAMPLE_STEP_DEFINITIONS)
+    # Load actual step definitions from project_steps
+    step_loader = StepLoader()
+    step_definitions, _ = step_loader.load_from_path("project_steps")
     
-    # Test 1: Simple linear workflow
-    print("\n📋 Test 1: Simple Linear Workflow")
+    # Create dependency resolver with actual steps
+    resolver = DependencyResolver(step_definitions)
+    
+    # Test 1: Simple project workflow
+    print("\n📋 Test 1: Simple Project Workflow")
     workflow1 = WorkflowDefinition(
-        name="Simple ML Pipeline",
-        description="A simple machine learning pipeline",
+        name="Simple Project Pipeline",
+        description="A simple project management pipeline",
         steps=[
-            WorkflowStep(step_id="load_data", params={"file_path": "data.csv"}),
-            WorkflowStep(step_id="clean_data", params={"remove_duplicates": True}),
-            WorkflowStep(step_id="feature_engineering", params={}),
-            WorkflowStep(step_id="train_model", params={"target_column": "target"}),
+            WorkflowStep(step_id="create_project", params={"project_name": "Test Project"}),
+            WorkflowStep(step_id="upload_file_to_project", params={"file_path": "/tmp/test.txt", "destination_path": "data/test.txt"}),
+            WorkflowStep(step_id="download_project_zip", params={"include_hidden": False}),
         ]
     )
     
@@ -45,8 +50,8 @@ def test_dependency_resolution():
         name="Invalid Workflow",
         description="A workflow with missing dependencies",
         steps=[
-            WorkflowStep(step_id="clean_data", params={}),  # Requires dataset but no step provides it
-            WorkflowStep(step_id="train_model", params={"target_column": "target"}),  # Requires featured_dataset
+            WorkflowStep(step_id="upload_file_to_project", params={"file_path": "/tmp/test.txt"}),  # Requires project_token
+            WorkflowStep(step_id="download_project_zip", params={}),  # Requires project_token
         ]
     )
     
@@ -57,16 +62,14 @@ def test_dependency_resolution():
     # Test 3: Complex workflow with all dependencies
     print("\n📋 Test 3: Complex Complete Workflow")
     workflow3 = WorkflowDefinition(
-        name="Complete ML Pipeline",
-        description="A complete machine learning pipeline",
+        name="Complete Project Pipeline",
+        description="A complete project management pipeline",
         steps=[
-            WorkflowStep(step_id="load_data", params={"file_path": "data.csv"}),
-            WorkflowStep(step_id="clean_data", params={"remove_duplicates": True}),
-            WorkflowStep(step_id="feature_engineering", params={}),
-            WorkflowStep(step_id="train_model", params={"target_column": "target"}),
-            WorkflowStep(step_id="evaluate_model", params={}),
-            WorkflowStep(step_id="generate_report", params={}),
-            WorkflowStep(step_id="save_results", params={"output_path": "./output"}),
+            WorkflowStep(step_id="create_project", params={"project_name": "Complete Test", "description": "A complete test"}),
+            WorkflowStep(step_id="upload_file_to_project", params={"file_path": "/tmp/test1.txt", "destination_path": "data/file1.txt"}),
+            WorkflowStep(step_id="upload_file_to_project", params={"file_path": "/tmp/test2.txt", "destination_path": "data/file2.txt"}),
+            WorkflowStep(step_id="list_project_files", params={"recursive": True, "include_hidden": False}),
+            WorkflowStep(step_id="download_project_zip", params={"include_hidden": False, "compression_level": 6}),
         ]
     )
     
@@ -99,7 +102,11 @@ def test_step_definitions():
     print("\n🔧 Testing Step Definitions")
     print("=" * 30)
     
-    for step_id, definition in EXAMPLE_STEP_DEFINITIONS.items():
+    # Load actual step definitions
+    step_loader = StepLoader()
+    step_definitions, _ = step_loader.load_from_path("project_steps")
+    
+    for step_id, definition in step_definitions.items():
         print(f"\n📦 {step_id}:")
         print(f"  Name: {definition.name}")
         print(f"  Category: {definition.category}")
@@ -113,6 +120,39 @@ def test_step_definitions():
             for input_schema in definition.io.inputs:
                 print(f"    - {input_schema.name} ({input_schema.type}) {'[required]' if input_schema.required else '[optional]'}")
 
+def test_custom_steps_dependencies():
+    """Test dependency resolution with custom steps"""
+    print("\n🔧 Testing Custom Steps Dependencies")
+    print("=" * 40)
+    
+    # Load custom step definitions
+    step_loader = StepLoader()
+    step_definitions, _ = step_loader.load_from_path("custom_steps")
+    
+    resolver = DependencyResolver(step_definitions)
+    
+    # Test ML pipeline workflow
+    workflow = WorkflowDefinition(
+        name="ML Pipeline",
+        description="A machine learning pipeline",
+        steps=[
+            WorkflowStep(step_id="data_validation", params={"data_path": "/data/input.csv"}),
+            WorkflowStep(step_id="data_processing", params={"algorithm": "standard"}),
+            WorkflowStep(step_id="model_training", params={"model_type": "neural_network"}),
+            WorkflowStep(step_id="result_analysis", params={"analysis_type": "comprehensive"}),
+        ]
+    )
+    
+    resolution = resolver.resolve_dependencies(workflow)
+    print(f"Execution order: {' -> '.join(resolution.execution_order)}")
+    print(f"Has cycles: {len(resolution.cycles) > 0}")
+    print(f"Missing dependencies: {len(resolution.missing_dependencies)}")
+    
+    # Test validation
+    errors, warnings = resolver.validate_workflow(workflow)
+    print(f"ML Pipeline - Valid: {len(errors) == 0}, Errors: {len(errors)}, Warnings: {len(warnings)}")
+
 if __name__ == "__main__":
     test_step_definitions()
-    test_dependency_resolution() 
+    test_dependency_resolution()
+    test_custom_steps_dependencies() 
