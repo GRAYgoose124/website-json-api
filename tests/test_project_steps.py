@@ -306,6 +306,12 @@ class TestProjectManagement:
             assert zip_result['files_included'] >= 1  # uploaded file (metadata is hidden)
             assert os.path.exists(zip_result['zip_file_path'])
             
+            # Check new download fields
+            assert 'download_url' in zip_result
+            assert 'download_filename' in zip_result
+            assert zip_result['download_url'].startswith('/download/')
+            assert zip_result['download_filename'].endswith('.zip')
+            
         finally:
             # Restore original projects root
             project_manager.projects_root = original_root

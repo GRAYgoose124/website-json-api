@@ -204,6 +204,11 @@ export default function App() {
           if (data.type === 'ping') return;
           
           setNotices(prev => [data, ...prev]);
+
+          if (isDownloadNotification(data)) {
+            // Check all workflows for download results
+            handleDownloadNotification(data);
+          }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
         }
@@ -245,6 +250,55 @@ export default function App() {
     } catch (error) {
       console.error('Failed to dismiss notice:', error);
     }
+  };
+
+  // Handle download notifications
+  const handleDownload = (downloadUrl, filename) => {
+    try {
+      // Create a temporary link element to trigger download
+      const link = document.createElement('a');
+      link.href = `${API_BASE}${downloadUrl}`;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log(`Download triggered: ${filename}`);
+    } catch (error) {
+      console.error('Failed to trigger download:', error);
+    }
+  };
+
+  // Handle download notifications by checking workflow results
+  const handleDownloadNotification = async (notice) => {
+    try {
+      // Fetch latest workflows to get the most recent results
+      const res = await fetch(`${API_BASE}/workflows`);
+      if (res.ok) {
+        const workflowsData = await res.json();
+        
+        // Find workflows that have completed and contain download results
+        for (const workflow of workflowsData) {
+          if (workflow.status === 'completed' && workflow.step_results) {
+            for (const [stepId, result] of Object.entries(workflow.step_results)) {
+              if (stepId === 'download_project_zip' && result.download_url && result.download_filename) {
+                console.log(`Found download result in workflow ${workflow.id}: ${result.download_filename}`);
+                handleDownload(result.download_url, result.download_filename);
+                return; // Only trigger the first download found
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to handle download notification:', error);
+    }
+  };
+
+  // Check if a notice is a download notification
+  const isDownloadNotification = (notice) => {
+    return notice.title === 'Download Ready' && notice.message && notice.message.includes('ZIP file ready for download');
   };
 
   const createWorkflow = async () => {
@@ -641,7 +695,7 @@ export default function App() {
                   </div>
                 ) : (
                   notices.map(notice => (
-                    <Notice key={notice.id} notice={notice} onDismiss={dismissNotice} />
+                    <Notice key={`tab-${notice.id}`} notice={notice} onDismiss={dismissNotice} />
                   ))
                 )}
               </div>
@@ -653,7 +707,7 @@ export default function App() {
         <div className="fixed bottom-4 right-4 space-y-2 z-50 max-w-sm">
           {notices.slice(0, 3).map(notice => (
             <Notice
-              key={notice.id}
+              key={`fixed-${notice.id}`}
               notice={notice}
               onDismiss={() => dismissNotice(notice.id)}
             />

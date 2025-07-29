@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Query, UploadFile, File
+from fastapi.responses import FileResponse
 from typing import List, Optional, Dict
 from datetime import datetime
 import asyncio
@@ -59,6 +60,44 @@ async def upload_file(file: UploadFile = File(...)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+
+@app.get("/download/{file_path:path}")
+async def download_file(file_path: str):
+    """Download a file from the server"""
+    try:
+        # Security: Only allow downloads from specific directories
+        allowed_dirs = [
+            getattr(app.state, 'uploads_dir', Path("./uploads")),
+            Path("./userdata/projects/downloads"),
+            Path("./test-userdata/projects/downloads")
+        ]
+        
+        # Convert file_path to Path (it's the filename)
+        filename = Path(file_path).name
+        
+        # Search for the file in allowed directories
+        actual_file_path = None
+        for allowed_dir in allowed_dirs:
+            if allowed_dir.exists():
+                potential_path = allowed_dir / filename
+                if potential_path.exists() and potential_path.is_file():
+                    actual_file_path = potential_path
+                    break
+        
+        if not actual_file_path:
+            raise HTTPException(status_code=404, detail="File not found")
+        
+        # Return the file for download
+        return FileResponse(
+            path=str(actual_file_path),
+            filename=actual_file_path.name,
+            media_type='application/octet-stream'
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
 # API Endpoints
 @app.get("/notices", response_model=List[Notice])

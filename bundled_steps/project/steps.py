@@ -170,10 +170,19 @@ async def download_project_zip(params: Dict[str, Any], context: StepContext):
         
         await context.success("ZIP Created", f"ZIP archive created successfully with {files_included} files")
         
+        # Emit download notification
+        await context.info("Download Ready", f"ZIP file ready for download: {zip_filename}")
+        
+        # Create a download URL for the browser - use just the filename
+        # The download endpoint will search for the file in allowed directories
+        download_url = f"/download/{zip_filename}"
+        
         return {
             'zip_file_path': zip_path,
             'zip_file_size': zip_file_size,
-            'files_included': files_included
+            'files_included': files_included,
+            'download_url': download_url,
+            'download_filename': zip_filename
         }
         
     except Exception as e:

@@ -159,9 +159,21 @@ STEP_DEFINITIONS = {
                     type=DataType.INTEGER,
                     description="Number of files included in the ZIP",
                     required=True
+                ),
+                IOSchema(
+                    name="download_url",
+                    type=DataType.STRING,
+                    description="URL for downloading the ZIP file",
+                    required=True
+                ),
+                IOSchema(
+                    name="download_filename",
+                    type=DataType.STRING,
+                    description="Filename of the ZIP file for download",
+                    required=True
                 )
             ],
-            context_keys=["zip_file_path", "zip_file_size", "files_included"]
+            context_keys=["zip_file_path", "zip_file_size", "files_included", "download_url", "download_filename"]
         )
     ),
     

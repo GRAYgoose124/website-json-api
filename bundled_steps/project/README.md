@@ -45,7 +45,7 @@ Uploads a local file to the specified project directory.
 
 ### 3. Download Project as ZIP (`download_project_zip`)
 
-Creates a ZIP archive of the project and provides download path.
+Creates a ZIP archive of the project and provides download path. **Automatically triggers browser download when workflow completes.**
 
 **Inputs:**
 - `project_token` (string): Project token for authentication (auto-filled from context)
@@ -56,8 +56,15 @@ Creates a ZIP archive of the project and provides download path.
 - `zip_file_path` (string): Path to the created ZIP file
 - `zip_file_size` (integer): Size of the ZIP file in bytes
 - `files_included` (integer): Number of files included in the ZIP
+- `download_url` (string): URL for downloading the ZIP file via browser
+- `download_filename` (string): Filename of the ZIP file for download
 
-**Context Keys:** `zip_file_path`, `zip_file_size`, `files_included`
+**Context Keys:** `zip_file_path`, `zip_file_size`, `files_included`, `download_url`, `download_filename`
+
+**Browser Integration:** When this step completes, the system automatically:
+1. Emits a "Download Ready" notification
+2. The frontend detects the notification and triggers a browser download
+3. The ZIP file is served via the `/download/{file_path}` endpoint
 
 ### 4. Validate Project Token (`validate_project_token`)
 
