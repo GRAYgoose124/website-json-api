@@ -36,11 +36,11 @@ class ServerManager:
         # Start the server
         cmd = [
             "uv", "run", "main.py",
+            "--port", str(self.port),
             "--userdata-root", "./test-userdata",
             "--include-steps-root", "./bundled_steps/project",
             "--include-steps-root", "./bundled_steps/custom",
-            "--host", "127.0.0.1",
-            "--port", str(self.port)
+            "--host", "127.0.0.1"
         ]
         
         print(f"🚀 Starting test server with command: {' '.join(cmd)}")
@@ -83,8 +83,7 @@ class ServerManager:
     async def _kill_existing_processes(self):
         """Kill any existing processes using the test port"""
         try:
-            # Simple approach: kill any main.py processes
-            subprocess.run(["pkill", "-f", "main.py"], capture_output=True)
+            subprocess.run(["pkill", "-f", f"main.py --port {self.port}"], capture_output=True)
             await asyncio.sleep(1)
         except Exception:
             pass

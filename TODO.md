@@ -1,1 +1,0 @@
-- Download project zip step should signal browser client to download the zip file when the workflow is completed.
