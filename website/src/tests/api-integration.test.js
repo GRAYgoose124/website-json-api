@@ -5,6 +5,8 @@
 
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 // API client for testing
 class ApiClient {
@@ -15,16 +17,10 @@ class ApiClient {
 
   setAuthToken(token) {
     this.authToken = token;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('authToken', token);
-    }
   }
 
   clearAuthToken() {
     this.authToken = null;
-    if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('authToken');
-    }
   }
 
   getHeaders() {
@@ -42,85 +38,83 @@ class ApiClient {
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}${endpoint}`;
     const config = {
+      method: 'GET',
       headers: this.getHeaders(),
-      ...options,
+      ...options
     };
-    
+
+    if (options.body) {
+      config.body = JSON.stringify(options.body);
+    }
+
     const response = await fetch(url, config);
     
-    // Only clear auth token if we get a 401 and we actually had a token
-    if (response.status === 401 && this.authToken) {
-      console.log('🔑 Got 401, clearing auth token');
-      this.clearAuthToken();
-      throw new Error('Authentication required');
-    }
-    
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
     }
     
+    // Parse JSON response
     const responseText = await response.text();
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (parseError) {
-      throw new Error(`Failed to parse response: ${parseError.message}`);
+    if (responseText.trim()) {
+      try {
+        return JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(`Failed to parse response: ${parseError.message}`);
+      }
     }
     
-    return responseData;
+    return null;
   }
 
   async get(endpoint) {
-    return this.request(endpoint, { method: 'GET' });
+    return this.request(endpoint);
   }
 
   async post(endpoint, data = null) {
-    const options = { method: 'POST' };
-    if (data) {
-      options.body = JSON.stringify(data);
-    }
-    return this.request(endpoint, options);
+    return this.request(endpoint, {
+      method: 'POST',
+      body: data
+    });
   }
 
   async uploadFile(file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await fetch(`${this.baseUrl}/upload-file`, {
+    // Note: This is a simplified file upload for testing
+    // In a real implementation, you'd use FormData
+    const url = `${this.baseUrl}/upload-file`;
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${this.authToken}`,
+        'Authorization': `Bearer ${this.authToken}`
       },
-      body: formData,
+      body: JSON.stringify({
+        filename: file.name,
+        content: file.content
+      })
     });
     
     if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`);
+      throw new Error(`Upload failed: ${response.status}`);
     }
     
-    return await response.json();
+    return response.json();
   }
 
   async login(username, password) {
-    // Use URLSearchParams for Node.js environment instead of FormData
-    const params = new URLSearchParams();
-    params.append('username', username);
-    params.append('password', password);
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
     
     const response = await fetch(`${this.baseUrl}/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: params.toString(),
+      body: formData
     });
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Login failed: ${response.status} ${response.statusText}`);
-      console.error(`Response body: ${errorText}`);
-      throw new Error(`Login failed: ${response.status} ${response.statusText}`);
+      throw new Error(`Login failed: ${response.status}`);
     }
     
     const data = await response.json();
@@ -134,6 +128,7 @@ class TestServer {
   constructor() {
     this.serverProcess = null;
     this.isReady = false;
+    this.tempUserdataDir = null;
   }
 
   async start() {
@@ -141,11 +136,14 @@ class TestServer {
       // Find the project root (two levels up from website/src/tests)
       const projectRoot = path.join(__dirname, '..', '..', '..');
       
-      // Start the Python backend server
+      // Create a temporary userdata directory for test isolation
+      this.tempUserdataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'workflow-api-test-'));
+      console.log(`🧪 Using temporary userdata directory: ${this.tempUserdataDir}`);
+      
+      // Start the Python backend server with main.py and proper command line arguments
       this.serverProcess = spawn('uv', ['run', 'main.py', 
-        '--include-steps-root', './bundled_steps/project',
-        '--include-steps-root', './bundled_steps/custom', 
         '--include-steps-root', './bundled_steps/test_suite',
+        '--userdata-root', this.tempUserdataDir,
         '--port', '8003'
       ], {
         cwd: projectRoot,
@@ -171,10 +169,14 @@ class TestServer {
         errorOutput += data.toString();
         const message = data.toString().trim();
         
-        // Don't log shutdown messages as errors
+        // Don't log normal startup messages as errors
         if (message.includes('Shutting down') || 
             message.includes('Application shutdown') || 
-            message.includes('Finished server process')) {
+            message.includes('Finished server process') ||
+            message.includes('Started server process') ||
+            message.includes('Waiting for application startup') ||
+            message.includes('Application startup complete') ||
+            message.includes('Uvicorn running on')) {
           console.log(`[SERVER] ${message}`);
         } else {
           console.error(`[SERVER ERROR] ${message}`);
@@ -213,6 +215,16 @@ class TestServer {
       this.serverProcess.kill();
       this.serverProcess = null;
       this.isReady = false;
+    }
+    
+    // Clean up temporary userdata directory
+    if (this.tempUserdataDir && fs.existsSync(this.tempUserdataDir)) {
+      try {
+        fs.rmSync(this.tempUserdataDir, { recursive: true, force: true });
+        console.log(`🧹 Cleaned up temporary userdata directory: ${this.tempUserdataDir}`);
+      } catch (error) {
+        console.warn(`⚠️  Failed to clean up temporary directory: ${error.message}`);
+      }
     }
   }
 
@@ -283,17 +295,14 @@ describe('API Integration Tests', () => {
     test('should get available steps', async () => {
       const steps = await apiClient.get('/steps');
       expect(steps).toBeDefined();
-      // Check if steps is directly an object or has a steps property
-      const stepsData = steps.steps || steps;
-      expect(stepsData).toBeDefined();
-      expect(typeof stepsData).toBe('object');
+      expect(typeof steps).toBe('object');
+      expect(Object.keys(steps).length).toBeGreaterThan(0);
     });
 
     test('should get specific step details', async () => {
       // First get all steps to find a valid step ID
       const allSteps = await apiClient.get('/steps');
-      const stepsData = allSteps.steps || allSteps;
-      const stepIds = Object.keys(stepsData);
+      const stepIds = Object.keys(allSteps);
       
       if (stepIds.length > 0) {
         const stepId = stepIds[0];
@@ -313,10 +322,10 @@ describe('API Integration Tests', () => {
         description: 'A test workflow created during integration tests',
         steps: [
           {
-            step_id: 'create_project',
+            step_id: 'data_source',
             params: { 
-              project_name: 'Test Integration Project',
-              project_description: 'Project created during integration tests'
+              source_type: 'file',
+              file_path: '/tmp/test.txt'
             }
           }
         ]
@@ -332,9 +341,7 @@ describe('API Integration Tests', () => {
     test('should list workflows', async () => {
       const workflows = await apiClient.get('/workflows');
       expect(workflows).toBeDefined();
-      // Check if workflows is directly an array or has a workflows property
-      const workflowsData = workflows.workflows || workflows;
-      expect(Array.isArray(workflowsData)).toBe(true);
+      expect(Array.isArray(workflows)).toBe(true);
     });
 
     test('should get workflow by ID', async () => {
@@ -342,7 +349,19 @@ describe('API Integration Tests', () => {
       const workflowDefinition = {
         name: 'Test Get Workflow',
         description: 'Workflow to test get by ID',
-        steps: []
+        steps: [
+          {
+            step_id: 'data_processor',
+            params: { 
+              data_id: 'test_data_123',
+              algorithm: 'standard',
+              parameters: {
+                filter_enabled: true,
+                quality_threshold: 0.8
+              }
+            }
+          }
+        ]
       };
 
       const created = await apiClient.post('/workflows', workflowDefinition);

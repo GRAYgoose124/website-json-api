@@ -53,7 +53,25 @@ def initialize_app_core():
     """Initialize the application core components."""
     print("🚀 Initializing Scientific Workflow API v2...")
     
-    # Initialize core components
+    # Check if core is already initialized (e.g., by main.py)
+    from app.core import step_registry
+    if step_registry and step_registry.definitions:
+        print(f"✅ Core already initialized with {len(step_registry.definitions)} steps")
+        # Just set up app state with existing instances
+        from app.core import project_manager, notice_manager, workflow_engine, dependency_resolver
+        app.state.project_manager = project_manager
+        app.state.notice_manager = notice_manager
+        app.state.step_registry = step_registry
+        app.state.workflow_engine = workflow_engine
+        app.state.dependency_resolver = dependency_resolver
+        app.state.uploads_dir = Path("./userdata/uploads")
+        return {
+            'total_steps': len(step_registry.definitions),
+            'uploads_dir': str(app.state.uploads_dir)
+        }
+    
+    # Only initialize if not already done by main.py
+    print("⚠️  Core not initialized by main.py, initializing with defaults")
     init_result = initialize_core(
         userdata_root="./userdata",
         step_paths=["bundled_steps/project", "bundled_steps/test_suite"]
