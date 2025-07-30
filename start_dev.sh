@@ -16,4 +16,5 @@ done
 
 # cd website && npm run test:[all,integration,unit]
 cd "$PROJECT_ROOT/website" && nohup npm run dev &
+echo "Running backend..."
 cd "$PROJECT_ROOT" && uv run main.py $INCLUDES

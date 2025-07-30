@@ -61,8 +61,9 @@ def initialize_core(userdata_root: str, step_paths: List[str]) -> Dict[str, Any]
         print(f"  - {step_path}")
         
         try:
-            # Use the singleton StepLoader to load steps
-            step_definitions, step_implementations = step_loader.load_from_path(step_path)
+            # Create a new StepLoader instance for each path to avoid accumulation
+            path_step_loader = StepLoader()
+            step_definitions, step_implementations = path_step_loader.load_from_path(step_path)
             
             # Merge step definitions and implementations
             for step_id, definition in step_definitions.items():
