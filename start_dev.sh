@@ -1,4 +1,9 @@
-#!
+#!/bin/bash
+
+if [ ! -f .git/hooks/pre-commit ]; then
+    ln -s .githooks/pre-commit .git/hooks/pre-commit
+fi
+
 STEPS_TO_INCLUDE=(project custom test_suite)
 
 INCLUDES=""
