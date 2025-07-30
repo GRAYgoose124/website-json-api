@@ -1,0 +1,21 @@
+#!/bin/bash
+set -e
+
+echo "Running pre-commit tests..."
+
+# Run Python tests, hide output unless failure
+if ! uv run pytest > /tmp/pytest.out 2>&1; then
+    cat /tmp/pytest.out
+    echo "FAILED: Python tests failed."
+    exit 1
+fi
+
+# Run JS tests in website/, hide output unless failure
+if ! (cd website && npm test > /tmp/js-test-output 2>&1); then
+    cat /tmp/js-test-output
+    echo "FAILED: JS tests failed."
+    exit 1
+fi
+
+echo -e "\033[32mAll tests passed.\033[0m"
+rm /tmp/pytest.out /tmp/js-test-output
