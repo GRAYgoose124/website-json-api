@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "jest",
+    "test:all": "npm run test:unit && npm run test:integration",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:integration": "TEST_ENV=integration jest src/tests/api-integration.test.js",

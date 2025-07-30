@@ -7,6 +7,9 @@ export default {
     '<rootDir>/src/tests/**/*.test.js',
     '<rootDir>/src/tests/**/*.test.jsx'
   ],
+  testPathIgnorePatterns: process.env.TEST_ENV !== 'integration' 
+    ? ['<rootDir>/src/tests/api-integration.test.js']
+    : [],
   collectCoverageFrom: [
     'src/**/*.{js,jsx}',
     '!src/tests/**',
