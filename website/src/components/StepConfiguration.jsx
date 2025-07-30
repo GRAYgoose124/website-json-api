@@ -23,6 +23,9 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove, workflowC
       
       const response = await fetch('http://localhost:8002/upload-file', {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+        },
         body: formData,
       });
       
@@ -310,12 +313,12 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove, workflowC
   };
 
   return (
-    <div className="bg-gray-800/30 rounded border border-gray-700/50 overflow-hidden">
+    <div className="bg-gray-800/30 rounded border border-gray-700/50 overflow-hidden card-mini">
       <div className="p-1.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <span className="text-sm">{getStepEmoji(step.step_id)}</span>
-            <span className="font-medium text-xs text-white truncate">
+            <span className="font-medium text-xs text-white truncate content-wrap">
               {stepDefinition?.name || step.step_id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
             </span>
           </div>
@@ -337,13 +340,13 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove, workflowC
       </div>
       
       {isExpanded && (
-        <div className="border-t border-gray-700/50 p-1.5 space-y-1.5">
+        <div className="border-t border-gray-700/50 p-1.5 space-y-1">
           {inputs.map((input) => {
             const autoFilled = isAutoFilled(input.name);
             return (
               <div key={input.name} className="space-y-0.5">
                 <div className="flex items-center gap-1">
-                  <label className="block text-xs font-medium text-gray-300">
+                  <label className="block text-xs font-medium text-gray-300 content-wrap">
                     {input.name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     {input.required && <span className="text-red-400 ml-1">*</span>}
                   </label>
@@ -355,7 +358,7 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove, workflowC
                 </div>
                 {renderParamInput(input)}
                 {input.description && (
-                  <p className="text-xs text-gray-400 mt-0.5">{input.description}</p>
+                  <p className="text-xs text-gray-400 mt-0.5 content-wrap">{input.description}</p>
                 )}
               </div>
             );

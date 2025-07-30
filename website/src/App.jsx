@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
-  AlertCircle, Sparkles, Plus, Settings, BarChart3, Info, RefreshCw
+  AlertCircle, Sparkles, Plus, Settings, BarChart3, Info, RefreshCw, LogOut
 } from 'lucide-react';
 
 // Import components
 import WorkflowChain from './components/WorkflowChain';
-import Notice from './components/Notice';
+import Notice, { NoticeGroup } from './components/Notice';
 import WorkflowCard from './components/WorkflowCard';
-import Modal from './components/Modal';
+import Modal, { OverlayPopup, Tooltip } from './components/Modal';
 import WorkflowDetails from './components/WorkflowDetails';
 import StepSelector from './components/StepSelector';
 import StepConfiguration from './components/StepConfiguration';
@@ -15,6 +15,7 @@ import Statistics from './components/Statistics';
 import ConnectionStatus from './components/ConnectionStatus';
 import LoadingSpinner from './components/LoadingSpinner';
 import StepDependencies from './components/StepDependencies';
+import LoginModal from './components/LoginModal';
 
 const API_BASE = 'http://localhost:8002';
 
@@ -40,6 +41,8 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [authToken, setAuthToken] = useState(localStorage.getItem('authToken'));
+  const [showLoginModal, setShowLoginModal] = useState(false);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
@@ -49,6 +52,11 @@ export default function App() {
   // Fetch initial data
   useEffect(() => {
     const initializeApp = async () => {
+      if (!authToken) {
+        setShowLoginModal(true);
+        return;
+      }
+      
       setIsLoading(true);
       try {
         await Promise.all([
@@ -60,21 +68,26 @@ export default function App() {
         ]);
       } catch (error) {
         console.error('Failed to initialize app:', error);
+        if (error.status === 401) {
+          setShowLoginModal(true);
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     initializeApp();
-    connectWebSocket();
-    startWorkflowPolling();
+    if (authToken) {
+      connectWebSocket();
+      startWorkflowPolling();
+    }
     
     return () => {
       if (wsRef.current) wsRef.current.close();
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (workflowPollingRef.current) clearInterval(workflowPollingRef.current);
     };
-  }, []);
+  }, [authToken]);
 
   // Start automatic workflow polling
   const startWorkflowPolling = () => {
@@ -100,89 +113,137 @@ export default function App() {
         fetchWorkflowDependencies(updatedWorkflow.id);
       }
     }
-  }, [workflows, selectedWorkflow]);
+  }, [workflows]);
 
   const fetchSteps = async () => {
     try {
       console.log('Fetching steps from:', `${API_BASE}/steps`);
-      const res = await fetch(`${API_BASE}/steps`);
+      const res = await fetch(`${API_BASE}/steps`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (res.ok) {
         const stepsData = await res.json();
         console.log('Fetched steps:', stepsData);
         setSteps(stepsData);
+      } else if (res.status === 401) {
+        throw { status: 401 };
       } else {
         console.error('Failed to fetch steps:', await res.text());
       }
     } catch (error) {
       console.error('Error fetching steps:', error);
+      throw error;
     }
   };
 
   const fetchStepCategories = async () => {
     try {
-      const res = await fetch(`${API_BASE}/steps/categories`);
+      const res = await fetch(`${API_BASE}/steps/categories`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (res.ok) {
         const categories = await res.json();
         setStepCategories(categories);
+      } else if (res.status === 401) {
+        throw { status: 401 };
       }
     } catch (error) {
       console.error('Error fetching step categories:', error);
+      throw error;
     }
   };
 
   const fetchStepTags = async () => {
     try {
-      const res = await fetch(`${API_BASE}/steps/tags`);
+      const res = await fetch(`${API_BASE}/steps/tags`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (res.ok) {
         const tags = await res.json();
         setStepTags(tags);
+      } else if (res.status === 401) {
+        throw { status: 401 };
       }
     } catch (error) {
       console.error('Error fetching step tags:', error);
+      throw error;
     }
   };
 
   const fetchWorkflows = async () => {
     try {
-      const res = await fetch(`${API_BASE}/workflows`);
+      const res = await fetch(`${API_BASE}/workflows`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (res.ok) {
         const workflowsData = await res.json();
         setWorkflows(workflowsData);
         setLastWorkflowUpdate(new Date());
+      } else if (res.status === 401) {
+        throw { status: 401 };
       } else {
         console.error('Failed to fetch workflows:', await res.text());
       }
     } catch (error) {
       console.error('Error fetching workflows:', error);
+      throw error;
     }
   };
 
   const fetchWorkflowDependencies = async (workflowId) => {
     try {
-      const res = await fetch(`${API_BASE}/workflows/${workflowId}/dependencies`);
+      const res = await fetch(`${API_BASE}/workflows/${workflowId}/dependencies`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (res.ok) {
         const dependencies = await res.json();
         setWorkflowDependencies(prev => ({
           ...prev,
           [workflowId]: dependencies
         }));
+      } else if (res.status === 401) {
+        throw { status: 401 };
       }
     } catch (error) {
       console.error('Error fetching workflow dependencies:', error);
+      throw error;
     }
   };
 
   const fetchNotices = async () => {
     try {
-      const res = await fetch(`${API_BASE}/notices`);
+      const res = await fetch(`${API_BASE}/notices`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
       if (res.ok) {
         const noticesData = await res.json();
         setNotices(noticesData);
+      } else if (res.status === 401) {
+        throw { status: 401 };
       } else {
         console.error('Failed to fetch notices:', await res.text());
       }
     } catch (error) {
       console.error('Error fetching notices:', error);
+      throw error;
     }
   };
 
@@ -245,19 +306,45 @@ export default function App() {
 
   const dismissNotice = async (id) => {
     try {
-      await fetch(`${API_BASE}/notices/${id}`, { method: 'DELETE' });
+      await fetch(`${API_BASE}/notices/${id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
       setNotices(prev => prev.filter(n => n.id !== id));
     } catch (error) {
       console.error('Failed to dismiss notice:', error);
     }
   };
 
+  const handleLogin = (token) => {
+    setAuthToken(token);
+    setShowLoginModal(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    setAuthToken(null);
+    setWorkflows([]);
+    setNotices([]);
+    setSteps({});
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+  };
+
   // Handle download notifications
   const handleDownload = (downloadUrl, filename) => {
     try {
+      console.log(`Attempting download: ${downloadUrl} -> ${filename}`);
+      
       // Create a temporary link element to trigger download
       const link = document.createElement('a');
-      link.href = `${API_BASE}${downloadUrl}`;
+      // Add cache-busting parameter to prevent browser caching
+      const cacheBuster = `?t=${Date.now()}`;
+      link.href = `${API_BASE}${downloadUrl}${cacheBuster}`;
       link.download = filename;
       link.style.display = 'none';
       document.body.appendChild(link);
@@ -273,22 +360,48 @@ export default function App() {
   // Handle download notifications by checking workflow results
   const handleDownloadNotification = async (notice) => {
     try {
+      console.log('Handling download notification:', notice);
+      
       // Fetch latest workflows to get the most recent results
       const res = await fetch(`${API_BASE}/workflows`);
       if (res.ok) {
         const workflowsData = await res.json();
         
-        // Find workflows that have completed or failed and contain download results
+        // Find the most recent completed workflow with download results
+        let mostRecentWorkflow = null;
+        let mostRecentTime = 0;
+        
         for (const workflow of workflowsData) {
-          if ((workflow.status === 'completed' || workflow.status === 'failed') && workflow.step_results) {
+          if (workflow.status === 'completed' && workflow.step_results) {
             for (const [stepId, result] of Object.entries(workflow.step_results)) {
               if (stepId === 'download_project_zip' && result.download_url && result.download_filename) {
-                console.log(`Found download result in workflow ${workflow.id}: ${result.download_filename}`);
-                handleDownload(result.download_url, result.download_filename);
-                return; // Only trigger the first download found
+                // Check if this workflow is more recent
+                const workflowTime = new Date(workflow.created_at || workflow.updated_at || 0).getTime();
+                if (workflowTime > mostRecentTime) {
+                  mostRecentTime = workflowTime;
+                  mostRecentWorkflow = { workflow, result };
+                }
               }
             }
           }
+        }
+        
+        // Only trigger download for the most recent workflow
+        if (mostRecentWorkflow) {
+          const { workflow, result } = mostRecentWorkflow;
+          console.log(`Found most recent download result in workflow ${workflow.id}: ${result.download_filename}`);
+          console.log(`Download URL: ${result.download_url}`);
+          console.log(`Workflow time: ${new Date(mostRecentTime).toISOString()}`);
+          
+          // Only trigger if the workflow was completed recently (within last 5 minutes)
+          const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+          if (mostRecentTime > fiveMinutesAgo) {
+            handleDownload(result.download_url, result.download_filename);
+          } else {
+            console.log(`Skipping download for old workflow: ${workflow.id} (completed ${new Date(mostRecentTime).toISOString()})`);
+          }
+        } else {
+          console.log('No recent completed workflows with download results found');
         }
       }
     } catch (error) {
@@ -314,7 +427,10 @@ export default function App() {
 
       const res = await fetch(`${API_BASE}/workflows`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json' 
+        },
         body: JSON.stringify(definition)
       });
 
@@ -455,22 +571,33 @@ export default function App() {
         onClose={() => setSelectedWorkflow(null)} 
       />
       
-      <div className="container mx-auto px-3 py-4">
-        {/* Header */}
-        <header className="mb-6">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="p-2 rounded-md bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
-              <Sparkles className="w-6 h-6 text-blue-400" />
+      <div className="max-w-7xl mx-auto px-3 py-3">
+        {/* Header - Compact */}
+        <header className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-md bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30">
+                <Sparkles className="w-4 h-4 text-blue-400" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold gradient-text-blue">
+                  Workflow Orchestration
+                </h1>
+                <p className="text-gray-400 text-xs">Scientific computing made elegant</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                Workflow Orchestration
-              </h1>
-              <p className="text-gray-400 text-xs">Scientific computing made elegant</p>
-            </div>
+            {authToken && (
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-red-500/20 border border-red-500/50 text-red-200 text-xs hover:bg-red-500/30 transition-colors"
+              >
+                <LogOut className="w-3 h-3" />
+                Logout
+              </button>
+            )}
           </div>
           {connectionError && (
-            <div className="flex items-center gap-2 p-2 rounded-md bg-red-500/20 border border-red-500/50 text-red-200 text-xs">
+            <div className="flex items-center gap-2 p-1.5 rounded-md bg-red-500/20 border border-red-500/50 text-red-200 text-xs">
               <AlertCircle className="w-3 h-3" />
               <span>{connectionError}</span>
             </div>
@@ -479,11 +606,11 @@ export default function App() {
 
         <Statistics workflows={workflows} notices={notices} />
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-          {/* Workflow Creation Sidebar */}
-          <div className="xl:col-span-2">
-            <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-3 border border-gray-700/50 shadow-lg sticky top-4">
+        {/* Main Content - Properly Tiled Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-4">
+          {/* Workflow Creation - Compact */}
+          <div className="lg:col-span-1">
+            <div className="glass-medium rounded-lg p-3 border border-gray-700/50 shadow-lg h-fit">
               <h2 className="text-sm font-semibold mb-3 flex items-center gap-2">
                 <Plus className="w-3 h-3 text-blue-400" />
                 Create Workflow
@@ -491,7 +618,7 @@ export default function App() {
               
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-300 mb-1">Workflow Name</label>
+                  <label className="block text-xs font-medium text-gray-300 mb-1">Name</label>
                   <input
                     type="text"
                     placeholder="Enter workflow name..."
@@ -501,7 +628,7 @@ export default function App() {
                   />
                 </div>
                 
-                {/* Step Filtering */}
+                {/* Step Filtering - Compact */}
                 <div className="space-y-2">
                   <div className="flex gap-2">
                     <select
@@ -537,11 +664,8 @@ export default function App() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Select Steps ({selectedSteps.length} selected, {Object.keys(filteredSteps()).length} available)
-                    {Object.keys(steps).length === 0 && (
-                      <span className="text-xs text-yellow-400 ml-2">Loading...</span>
-                    )}
+                  <label className="block text-xs font-medium text-gray-300 mb-1">
+                    Steps ({selectedSteps.length} selected, {Object.keys(filteredSteps()).length} available)
                   </label>
                   <StepSelector 
                     steps={filteredSteps()} 
@@ -550,36 +674,38 @@ export default function App() {
                   />
                 </div>
                 
-                <button
-                  onClick={createWorkflow}
-                  disabled={!workflowName || selectedSteps.length === 0 || isCreatingWorkflow}
-                  className="w-full py-2 rounded-md bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium shadow-lg flex items-center justify-center gap-2 text-xs"
-                >
-                  {isCreatingWorkflow ? (
-                    <>
-                      <LoadingSpinner size="sm" />
-                      Creating...
-                    </>
-                  ) : (
-                    <>
-                      <Plus className="w-3 h-3" />
-                      Create Workflow
-                    </>
-                  )}
-                </button>
+                <Tooltip content={!workflowName ? "Enter a workflow name" : selectedSteps.length === 0 ? "Select at least one step" : "Create new workflow"}>
+                  <button
+                    onClick={createWorkflow}
+                    disabled={!workflowName || selectedSteps.length === 0 || isCreatingWorkflow}
+                    className="w-full py-2 rounded-md bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-medium shadow-lg flex items-center justify-center gap-2 text-xs copy-button"
+                  >
+                    {isCreatingWorkflow ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3 h-3" />
+                        Create Workflow
+                      </>
+                    )}
+                  </button>
+                </Tooltip>
               </div>
             </div>
           </div>
 
-          {/* Step Configuration Area */}
-          <div className="xl:col-span-3">
+          {/* Step Configuration - Compact */}
+          <div className="lg:col-span-1">
             {selectedSteps.length > 0 ? (
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-3 border border-gray-700/50 shadow-lg">
+              <div className="glass-medium rounded-lg p-3 border border-gray-700/50 shadow-lg h-fit">
                 <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
                   <Settings className="w-3 h-3 text-purple-400" />
-                  Step Configuration ({selectedSteps.length} steps)
+                  Step Config ({selectedSteps.length})
                 </h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
+                <div className="space-y-2 max-h-80 overflow-y-auto">
                   {selectedSteps.map(step => (
                     <StepConfiguration
                       key={step.step_id}
@@ -593,137 +719,143 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-800/30 backdrop-blur-sm rounded-lg p-6 border border-gray-700/50 shadow-lg flex items-center justify-center">
+              <div className="glass-medium rounded-lg p-6 border border-gray-700/50 shadow-lg flex items-center justify-center h-40">
                 <div className="text-center text-gray-500">
                   <Settings className="w-8 h-8 mx-auto mb-2 opacity-50" />
                   <p className="text-sm font-medium mb-1">No steps selected</p>
-                  <p className="text-xs">Select steps from the left panel to configure them here</p>
+                  <p className="text-gray-400 text-xs">Select steps to configure</p>
                 </div>
               </div>
             )}
           </div>
-        </div>
 
-        {/* Main Content Area */}
-        <div className="mt-4">
-          {/* Tab Navigation */}
-          <div className="flex items-center gap-1 mb-4 bg-gray-800/30 rounded-md p-1 border border-gray-700/50">
-            <button
-              onClick={() => setActiveTab('workflows')}
-              className={`flex-1 py-1.5 px-3 rounded font-medium transition-all duration-300 text-xs ${
-                activeTab === 'workflows'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 justify-center">
-                <BarChart3 className="w-3 h-3" />
-                Workflows ({workflows.length})
-              </div>
-            </button>
-            <button
-              onClick={() => setActiveTab('notices')}
-              className={`flex-1 py-1.5 px-3 rounded font-medium transition-all duration-300 text-xs ${
-                activeTab === 'notices'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'text-gray-400 hover:text-gray-300 hover:bg-gray-700/30'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 justify-center">
-                <Info className="w-3 h-3" />
-                Notices ({notices.length})
-              </div>
-            </button>
-          </div>
-
-          {/* Tab Content */}
-          {activeTab === 'workflows' ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-semibold flex items-center gap-1.5">
-                    <BarChart3 className="w-3 h-3 text-purple-400" />
-                    Active Workflows
-                    {workflowPollingRef.current && autoUpdateEnabled && (
-                      <span className="text-xs text-green-400 flex items-center gap-1">
-                        <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse" />
-                        Auto
-                      </span>
-                    )}
-                  </h2>
-                  {lastWorkflowUpdate && (
-                    <span className="text-xs text-gray-500">
-                      Updated: {lastWorkflowUpdate.toLocaleTimeString()}
-                    </span>
-                  )}
+          {/* Workflow Controls - Compact */}
+          <div className="lg:col-span-1">
+            <div className="glass-medium rounded-lg p-3 border border-gray-700/50 shadow-lg h-fit">
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <BarChart3 className="w-3 h-3 text-green-400" />
+                Workflow Controls
+              </h3>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-300">Auto Updates</span>
+                  <Tooltip content={autoUpdateEnabled ? "Auto-updates enabled" : "Manual updates only"}>
+                    <button
+                      onClick={toggleAutoUpdate}
+                      className={`flex items-center gap-1 px-2 py-1 rounded border transition-colors text-xs ${
+                        autoUpdateEnabled 
+                          ? 'bg-green-500/20 border-green-500/50 text-green-400 hover:border-green-400' 
+                          : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600'
+                      }`}
+                    >
+                      <div className={`w-1 h-1 rounded-full ${autoUpdateEnabled ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
+                      {autoUpdateEnabled ? 'Auto' : 'Manual'}
+                    </button>
+                  </Tooltip>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    onClick={toggleAutoUpdate}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded border transition-colors text-xs ${
-                      autoUpdateEnabled 
-                        ? 'bg-green-500/20 border-green-500/50 text-green-400 hover:border-green-400' 
-                        : 'bg-gray-800/50 border-gray-700 text-gray-400 hover:border-gray-600'
-                    }`}
-                  >
-                    <div className={`w-1 h-1 rounded-full ${autoUpdateEnabled ? 'bg-green-400 animate-pulse' : 'bg-gray-500'}`} />
-                    {autoUpdateEnabled ? 'Auto' : 'Manual'}
-                  </button>
+                
+                <Tooltip content="Refresh workflows">
                   <button
                     onClick={fetchWorkflows}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded bg-gray-800/50 border border-gray-700 hover:border-gray-600 transition-colors text-xs"
+                    className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded glass-light border border-gray-700 hover:border-gray-600 transition-colors text-xs"
                   >
                     <RefreshCw className="w-3 h-3" />
-                    Refresh
+                    Refresh Workflows
                   </button>
+                </Tooltip>
+                
+                {lastWorkflowUpdate && (
+                  <div className="text-xs text-gray-500 text-center">
+                    Updated: {lastWorkflowUpdate.toLocaleTimeString()}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stats - Compact */}
+          <div className="lg:col-span-1">
+            <div className="glass-medium rounded-lg p-3 border border-gray-700/50 shadow-lg h-fit">
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <BarChart3 className="w-3 h-3 text-blue-400" />
+                Quick Stats
+              </h3>
+              
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Active Workflows:</span>
+                  <span className="text-white font-medium">{workflows.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Total Notices:</span>
+                  <span className="text-white font-medium">{notices.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Available Steps:</span>
+                  <span className="text-white font-medium">{Object.keys(steps).length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Selected Steps:</span>
+                  <span className="text-white font-medium">{selectedSteps.length}</span>
                 </div>
               </div>
-              
-              <div className="grid gap-3">
-                {workflows.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500 bg-gray-800/30 rounded-lg border border-gray-700/50">
-                    <BarChart3 className="w-8 h-8 mx-auto mb-3 opacity-50" />
-                    <h3 className="text-sm font-medium mb-1">No workflows yet</h3>
-                    <p className="text-gray-400 text-xs">Create your first workflow to get started</p>
-                  </div>
-                ) : (
-                  workflows.map(workflow => (
-                    <WorkflowCard 
-                      key={workflow.id} 
-                      workflow={workflow} 
-                      onSelect={setSelectedWorkflow}
-                      isSelected={selectedWorkflow?.id === workflow.id}
-                      isAutoUpdating={!!workflowPollingRef.current && autoUpdateEnabled}
-                      dependencies={workflowDependencies[workflow.id]}
-                    />
-                  ))
-                )}
-              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              <h2 className="text-sm font-semibold flex items-center gap-1.5">
-                <Info className="w-3 h-3 text-blue-400" />
-                System Notices
-              </h2>
-              <div className="space-y-2 max-h-[400px] overflow-y-auto bg-gray-800/30 rounded-lg p-3 border border-gray-700/50">
-                {notices.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <h3 className="text-sm font-medium mb-1">No notices</h3>
-                    <p className="text-gray-400 text-xs">System notices will appear here</p>
-                  </div>
-                ) : (
-                  notices.map((notice, index) => (
-                    <Notice key={`tab-${notice.id}-${index}`} notice={notice} onDismiss={dismissNotice} />
-                  ))
-                )}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
-        {/* Notices */}
+        {/* Workflows and Notices - Side by Side */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {/* Workflows Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold flex items-center gap-1.5">
+                <BarChart3 className="w-3 h-3 text-purple-400" />
+                Active Workflows ({workflows.length})
+                {workflowPollingRef.current && autoUpdateEnabled && (
+                  <span className="text-xs text-green-400 flex items-center gap-1">
+                    <div className="w-1 h-1 bg-green-400 rounded-full animate-pulse" />
+                    Auto
+                  </span>
+                )}
+              </h2>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {workflows.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 glass-medium rounded-lg border border-gray-700/50 col-span-full">
+                  <BarChart3 className="w-6 h-6 mx-auto mb-2 opacity-50" />
+                  <h3 className="text-sm font-medium mb-1">No workflows yet</h3>
+                  <p className="text-gray-400 text-xs">Create your first workflow to get started</p>
+                </div>
+              ) : (
+                workflows.map(workflow => (
+                  <WorkflowCard 
+                    key={workflow.id} 
+                    workflow={workflow} 
+                    onSelect={setSelectedWorkflow}
+                    isSelected={selectedWorkflow?.id === workflow.id}
+                    isAutoUpdating={!!workflowPollingRef.current && autoUpdateEnabled}
+                    dependencies={workflowDependencies[workflow.id]}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Notices Section */}
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold flex items-center gap-1.5">
+              <Info className="w-3 h-3 text-blue-400" />
+              System Notices ({notices.length})
+            </h2>
+            <div className="glass-medium rounded-lg border border-gray-700/50">
+              <NoticeGroup notices={notices} onDismiss={dismissNotice} />
+            </div>
+          </div>
+        </div>
+
+        {/* Fixed Notices */}
         <div className="fixed bottom-4 right-4 space-y-2 z-50 max-w-sm">
           {notices.slice(0, 3).map((notice, index) => (
             <Notice
@@ -734,6 +866,13 @@ export default function App() {
           ))}
         </div>
       </div>
+
+      {/* Login Modal */}
+      <LoginModal 
+        isOpen={showLoginModal} 
+        onLogin={handleLogin} 
+        onClose={() => setShowLoginModal(false)} 
+      />
     </div>
   );
 }

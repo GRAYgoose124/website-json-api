@@ -12,36 +12,36 @@ const Statistics = ({ workflows, notices }) => {
 
   const getStatusColor = (status) => {
     const colors = {
-      total: 'from-blue-500 to-blue-600',
-      running: 'from-green-500 to-green-600',
-      completed: 'from-purple-500 to-purple-600',
-      failed: 'from-red-500 to-red-600',
-      notices: 'from-indigo-500 to-indigo-600'
+      total: 'text-blue-400 bg-blue-600/20 border-blue-500/30',
+      running: 'text-green-400 bg-green-600/20 border-green-500/30',
+      completed: 'text-purple-400 bg-purple-600/20 border-purple-500/30',
+      failed: 'text-red-400 bg-red-600/20 border-red-500/30',
+      notices: 'text-indigo-400 bg-indigo-600/20 border-indigo-500/30'
     };
     return colors[status];
   };
 
   const getStatusIcon = (status) => {
     const icons = {
-      total: <BarChart3 className="w-4 h-4" />,
-      running: <Activity className="w-4 h-4" />,
-      completed: <CheckCircle className="w-4 h-4" />,
-      failed: <AlertCircle className="w-4 h-4" />,
-      notices: <Info className="w-4 h-4" />
+      total: <BarChart3 className="w-3 h-3" />,
+      running: <Activity className="w-3 h-3" />,
+      completed: <CheckCircle className="w-3 h-3" />,
+      failed: <AlertCircle className="w-3 h-3" />,
+      notices: <Info className="w-3 h-3" />
     };
     return icons[status];
   };
 
   return (
-    <div className="grid grid-cols-5 gap-2 mb-4">
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-3">
       {Object.entries(stats).map(([key, value]) => (
-        <div key={key} className="bg-gray-800/30 backdrop-blur-sm rounded-md p-2 border border-gray-700/50">
+        <div key={key} className="glass-light rounded-md p-1.5 border border-gray-700/50 card-mini">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-gray-400 capitalize">{key}</p>
               <p className="text-sm font-bold text-white">{value}</p>
             </div>
-            <div className={`p-1.5 rounded-md bg-gradient-to-br ${getStatusColor(key)}`}>
+            <div className={`p-1 rounded-md border ${getStatusColor(key)}`}>
               {getStatusIcon(key)}
             </div>
           </div>

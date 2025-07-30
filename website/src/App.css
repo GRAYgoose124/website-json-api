@@ -116,37 +116,33 @@ button:not(:disabled):active {
   overflow: hidden;
 }
 
-/* Glass morphism utilities */
+/* Glass morphism effects */
 .glass-light {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .glass-medium {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 8px 32px -1px rgba(0, 0, 0, 0.15), 0 4px 16px -1px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .glass-heavy {
-  background: rgba(255, 255, 255, 0.09);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 16px 64px -1px rgba(0, 0, 0, 0.2), 0 8px 32px -1px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.15);
 }
 
-/* Enhanced card effects */
+/* Enhanced card glow effects */
 .card-glow {
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   transition: all 0.3s ease;
 }
 
 .card-glow:hover {
-  box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
 }
 
 /* Gradient text effects */
@@ -164,7 +160,7 @@ button:not(:disabled):active {
   background-clip: text;
 }
 
-/* Animated borders */
+/* Animated border effects */
 .animated-border {
   position: relative;
   background: linear-gradient(45deg, #3b82f6, #8b5cf6, #ec4899, #3b82f6);
@@ -175,20 +171,128 @@ button:not(:disabled):active {
 }
 
 .animated-border > * {
-  background: rgba(17, 24, 39, 0.8);
+  background: rgb(17, 24, 39);
   border-radius: 0.375rem;
-  backdrop-filter: blur(12px);
+  padding: 1rem;
 }
 
-/* Compact form styles */
+/* Tiled layout enhancements */
+.tiled-grid {
+  display: grid !important;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.tiled-grid-compact {
+  display: grid !important;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* Step configuration tiled layout */
+.step-config-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.5rem;
+}
+
+/* Force flexbox layouts */
+.flex {
+  display: flex !important;
+}
+
+.flex-wrap {
+  flex-wrap: wrap !important;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0 !important;
+}
+
+/* Ensure no full-width elements */
+.container {
+  max-width: 1200px !important;
+}
+
+/* Force grid layouts to work properly */
+.grid {
+  display: grid !important;
+}
+
+/* Prevent full-width elements */
+.w-full {
+  max-width: 100% !important;
+}
+
+/* Fixed width utilities */
+.w-80 {
+  width: 20rem !important;
+  max-width: 20rem !important;
+}
+
+.w-96 {
+  width: 24rem !important;
+  max-width: 24rem !important;
+}
+
+/* Compact card styles */
+.card-compact {
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.card-mini {
+  padding: 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Information density utilities */
+.info-dense {
+  line-height: 1.2;
+  margin: 0.25rem 0;
+}
+
+.info-dense-sm {
+  line-height: 1.1;
+  margin: 0.125rem 0;
+  font-size: 0.75rem;
+}
+
+/* Efficient spacing */
+.space-tight {
+  gap: 0.25rem;
+}
+
+.space-tighter {
+  gap: 0.125rem;
+}
+
+/* Responsive text sizing */
+.text-responsive {
+  font-size: clamp(0.75rem, 2vw, 0.875rem);
+}
+
+.text-responsive-sm {
+  font-size: clamp(0.625rem, 1.5vw, 0.75rem);
+}
+
+/* Enhanced content wrapping */
+.content-wrap {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+/* Compact form elements */
 .form-compact input,
 .form-compact select,
 .form-compact textarea {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.875rem;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(107, 114, 128, 0.3);
-  background: rgba(31, 41, 55, 0.5);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(75, 85, 99, 0.5);
+  background: rgba(17, 24, 39, 0.5);
+  color: white;
   transition: all 0.2s ease;
 }
 
@@ -196,49 +300,52 @@ button:not(:disabled):active {
 .form-compact select:focus,
 .form-compact textarea:focus {
   outline: none;
-  border-color: rgba(59, 130, 246, 0.5);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
 /* Compact button styles */
 .btn-compact {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  border-radius: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
   font-weight: 500;
+  border-radius: 0.25rem;
   transition: all 0.2s ease;
+  border: 1px solid transparent;
 }
 
 .btn-compact:hover {
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .btn-compact:active {
   transform: translateY(0);
 }
 
-/* Status color utilities */
+/* Status-specific styles */
 .status-pending {
-  color: rgb(156 163 175);
-  background-color: rgba(156 163 175 / 0.2);
+  color: #9ca3af;
+  background: rgba(156, 163, 175, 0.1);
 }
 
 .status-running {
-  color: rgb(59 130 246);
-  background-color: rgba(59 130 246 / 0.2);
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.1);
+  animation: pulse 2s infinite;
 }
 
 .status-completed {
-  color: rgb(34 197 94);
-  background-color: rgba(34 197 94 / 0.2);
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
 }
 
 .status-failed {
-  color: rgb(239 68 68);
-  background-color: rgba(239 68 68 / 0.2);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
 }
 
-/* Animation utilities */
+/* Animation keyframes */
 .animate-fade-in {
   animation: fadeIn 0.3s ease-in-out;
 }
@@ -279,5 +386,95 @@ button:not(:disabled):active {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* Enhanced pulse animation */
+@keyframes enhanced-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+/* Emoji bounce animation */
+@keyframes emoji-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+/* Compact notice styles */
+.notice-compact {
+  padding: 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.notice-group {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Scrollbar styling */
+.notice-group::-webkit-scrollbar {
+  width: 4px;
+}
+
+.notice-group::-webkit-scrollbar-track {
+  background: rgba(75, 85, 99, 0.2);
+  border-radius: 2px;
+}
+
+.notice-group::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 2px;
+}
+
+.notice-group::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+/* Copy button animation */
+.copy-button {
+  transition: all 0.2s ease;
+}
+
+.copy-button:hover {
+  transform: scale(1.05);
+}
+
+.copy-button:active {
+  transform: scale(0.95);
+}
+
+/* Workflow chain compact scaling */
+.workflow-chain-compact {
+  transform: scale(0.75);
+  transform-origin: center;
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 1024px) {
+  .step-config-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .tiled-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .tiled-grid-compact {
+    grid-template-columns: 1fr !important;
   }
 }
