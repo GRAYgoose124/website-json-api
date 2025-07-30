@@ -153,11 +153,13 @@ def test_upload_download_dependency():
             print(f"  {step_id} requires no context")
     
     # Verify that download_project_zip depends on upload_file_to_project
-    download_deps = resolution.dependencies.get("download_project_zip", [])
-    if "upload_file_to_project" in download_deps:
+    # Check context flow instead of dependencies since we now use instance IDs internally
+    download_context_flow = resolution.context_flow.get("download_project_zip", {})
+    if "uploaded_file_path" in download_context_flow and download_context_flow["uploaded_file_path"] == "upload_file_to_project":
         print("✅ SUCCESS: download_project_zip correctly depends on upload_file_to_project")
     else:
         print("❌ FAILURE: download_project_zip does not depend on upload_file_to_project")
+        print(f"  Context flow for download_project_zip: {download_context_flow}")
         assert False, "download_project_zip does not depend on upload_file_to_project"
     
     print("✅ All dependency tests passed!")

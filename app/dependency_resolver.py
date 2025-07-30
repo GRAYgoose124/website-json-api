@@ -21,12 +21,18 @@ class DependencyResolver:
         Returns:
             DependencyResolution object with execution order and dependency information
         """
-        # Build step lookup
-        step_lookup = {step.step_id: step for step in workflow.steps}
+        # Clear any existing dependency data to prevent accumulation
+        for step in workflow.steps:
+            step.provides.clear()
+            step.requires.clear()
+            step.auto_dependencies.clear()
+        
+        # Build step lookup by instance_id
+        step_lookup = {step.instance_id: step for step in workflow.steps}
         
         # Analyze IO requirements and build context flow
-        context_providers = {}  # context_key -> step_id
-        context_consumers = defaultdict(list)  # context_key -> [step_ids]
+        context_providers = defaultdict(list)  # context_key -> [instance_ids]
+        context_consumers = defaultdict(list)  # context_key -> [instance_ids]
         
         # First pass: identify what each step provides
         for step in workflow.steps:
@@ -36,11 +42,9 @@ class DependencyResolver:
             
             # What this step provides
             for context_key in step_def.io.context_keys:
-                if context_key in context_providers:
-                    logger.warning(f"Multiple steps provide context key '{context_key}': "
-                                f"{context_providers[context_key]} and {step.step_id}")
-                context_providers[context_key] = step.step_id
-                step.provides.append(context_key)
+                context_providers[context_key].append(step.instance_id)
+                if context_key not in step.provides:  # Prevent duplicates
+                    step.provides.append(context_key)
         
         # Second pass: identify what each step requires
         for step in workflow.steps:
@@ -53,43 +57,68 @@ class DependencyResolver:
                 # Consider both required and optional inputs that have context providers
                 # This ensures proper dependency ordering even for optional inputs
                 if input_schema.name in context_providers:
-                    provider_step = context_providers[input_schema.name]
-                    if provider_step != step.step_id:
-                        step.requires.append(input_schema.name)
-                        context_consumers[input_schema.name].append(step.step_id)
+                    # Find the first provider that's not this step itself
+                    provider_instance_id = None
+                    for provider_id in context_providers[input_schema.name]:
+                        if provider_id != step.instance_id:
+                            provider_instance_id = provider_id
+                            break
+                    
+                    if provider_instance_id:
+                        if input_schema.name not in step.requires:  # Prevent duplicates
+                            step.requires.append(input_schema.name)
+                        context_consumers[input_schema.name].append(step.instance_id)
         
-        # Build dependency graph
+        # Build dependency graph using instance_ids
         dependencies = defaultdict(list)
         dependents = defaultdict(list)
         
         for step in workflow.steps:
-            # Manual dependencies
+            # Manual dependencies (convert step_id to instance_id if needed)
             for dep in step.depends_on:
-                if dep in step_lookup:
-                    dependencies[step.step_id].append(dep)
-                    dependents[dep].append(step.step_id)
+                # Find the step with this step_id
+                dep_step = next((s for s in workflow.steps if s.step_id == dep), None)
+                if dep_step:
+                    dependencies[step.instance_id].append(dep_step.instance_id)
+                    dependents[dep_step.instance_id].append(step.instance_id)
             
             # Auto-generated dependencies based on context requirements
             for context_key in step.requires:
                 if context_key in context_providers:
-                    provider_step = context_providers[context_key]
-                    if provider_step != step.step_id and provider_step not in dependencies[step.step_id]:
-                        dependencies[step.step_id].append(provider_step)
-                        dependents[provider_step].append(step.step_id)
-                        step.auto_dependencies.append(provider_step)
+                    # Find the first provider that's not this step itself
+                    provider_instance_id = None
+                    for provider_id in context_providers[context_key]:
+                        if provider_id != step.instance_id:
+                            provider_instance_id = provider_id
+                            break
+                    
+                    if provider_instance_id and provider_instance_id not in dependencies[step.instance_id]:
+                        dependencies[step.instance_id].append(provider_instance_id)
+                        dependents[provider_instance_id].append(step.instance_id)
+                        # Store the step_id for auto_dependencies (for backward compatibility)
+                        provider_step = step_lookup[provider_instance_id]
+                        if provider_step.step_id not in step.auto_dependencies:  # Prevent duplicates
+                            step.auto_dependencies.append(provider_step.step_id)
         
         # Detect cycles
         cycles = self._detect_cycles(dependencies)
         
-        # Find execution order (topological sort)
-        execution_order = self._topological_sort(dependencies, workflow)
+        # Find execution order (topological sort) - convert back to step_ids for backward compatibility
+        execution_order_instance_ids = self._topological_sort(dependencies, workflow)
+        execution_order = [step_lookup[instance_id].step_id for instance_id in execution_order_instance_ids if instance_id in step_lookup]
         
         # Find missing dependencies
         missing_dependencies = []
         for step in workflow.steps:
-            for context_key in step.requires:
-                if context_key not in context_providers:
-                    missing_dependencies.append(f"Step '{step.step_id}' requires '{context_key}' but no step provides it")
+            step_def = self.step_definitions.get(step.step_id)
+            if not step_def:
+                continue
+                
+            for input_schema in step_def.io.inputs:
+                # Only check for missing dependencies that should be provided by other steps
+                # Skip parameters that are provided by the user in step.params
+                if input_schema.required and input_schema.name not in context_providers and input_schema.name not in step.params:
+                    missing_dependencies.append(f"Step '{step.step_id}' requires '{input_schema.name}' but no step provides it")
         
         # Build context flow mapping
         context_flow = {}
@@ -97,7 +126,15 @@ class DependencyResolver:
             context_flow[step.step_id] = {}
             for context_key in step.requires:
                 if context_key in context_providers:
-                    context_flow[step.step_id][context_key] = context_providers[context_key]
+                    # Find the first provider that's not this step itself
+                    provider_instance_id = None
+                    for provider_id in context_providers[context_key]:
+                        if provider_id != step.instance_id:
+                            provider_instance_id = provider_id
+                            break
+                    if provider_instance_id:
+                        provider_step = step_lookup[provider_instance_id]
+                        context_flow[step.step_id][context_key] = provider_step.step_id
         
         return DependencyResolution(
             workflow_id=workflow.name,
@@ -153,7 +190,7 @@ class DependencyResolver:
         
         # Initialize in-degree for all steps (including those without dependencies)
         for step in workflow.steps:
-            in_degree[step.step_id] = 0
+            in_degree[step.instance_id] = 0
         
         # Add dependencies to in-degree calculation
         for node, deps in dependencies.items():

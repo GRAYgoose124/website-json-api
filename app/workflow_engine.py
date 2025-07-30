@@ -31,44 +31,44 @@ class WorkflowEngine:
             for step_id in dependency_resolution.execution_order:
                 workflow.current_step = step_id
                 
-                # Find the step in the workflow
-                step = next((s for s in workflow.definition.steps if s.step_id == step_id), None)
-                if not step:
-                    continue
+                # Find all steps with this step_id (there can be multiple instances)
+                matching_steps = [s for s in workflow.definition.steps if s.step_id == step_id]
                 
-                # Prepare step parameters with context values
-                params = self._prepare_step_params(step, workflow.context)
-                
-                # Create step context
-                context = StepContext(
-                    workflow_id=workflow.id,
-                    step_id=step_id,
-                    notice_manager=self.notice_manager,
-                    workflow_context=workflow.context
-                )
-                
-                try:
-                    # Execute the step
-                    result = await self.step_registry.execute(step_id, params, context)
+                for step in matching_steps:
+                    # Prepare step parameters with context values
+                    params = self._prepare_step_params(step, workflow.context)
                     
-                    # Store result
-                    workflow.step_results[step_id] = result
+                    # Create step context
+                    context = StepContext(
+                        workflow_id=workflow.id,
+                        step_id=step_id,
+                        notice_manager=self.notice_manager,
+                        workflow_context=workflow.context
+                    )
                     
-                    # Check if step failed (look for failure indicators in the result)
-                    if self._is_step_failed(result):
-                        await context.error("Step Failed", f"Step {step_id} failed: {self._get_step_failure_message(result)}")
+                    try:
+                        # Execute the step
+                        result = await self.step_registry.execute(step_id, params, context)
+                        
+                        # Store result with instance_id to avoid overwriting
+                        result_key = f"{step_id}_{step.instance_id}" if len(matching_steps) > 1 else step_id
+                        workflow.step_results[result_key] = result
+                        
+                        # Check if step failed (look for failure indicators in the result)
+                        if self._is_step_failed(result):
+                            await context.error("Step Failed", f"Step {step_id} failed: {self._get_step_failure_message(result)}")
+                            workflow.status = WorkflowStatus.FAILED
+                            workflow.completed_at = datetime.now(UTC)
+                            return
+                        
+                        # Update workflow context with step outputs
+                        self._update_workflow_context(workflow, step_id, result)
+                        
+                    except Exception as e:
+                        await context.error("Step Failed", f"Step {step_id} failed: {str(e)}")
                         workflow.status = WorkflowStatus.FAILED
                         workflow.completed_at = datetime.now(UTC)
                         return
-                    
-                    # Update workflow context with step outputs
-                    self._update_workflow_context(workflow, step_id, result)
-                    
-                except Exception as e:
-                    await context.error("Step Failed", f"Step {step_id} failed: {str(e)}")
-                    workflow.status = WorkflowStatus.FAILED
-                    workflow.completed_at = datetime.now(UTC)
-                    return
             
             workflow.status = WorkflowStatus.COMPLETED
             workflow.completed_at = datetime.now(UTC)

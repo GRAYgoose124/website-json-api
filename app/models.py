@@ -84,6 +84,7 @@ class StepDefinition(BaseModel):
 
 class WorkflowStep(BaseModel):
     step_id: str
+    instance_id: str = Field(default_factory=lambda: str(uuid.uuid4()))  # Unique identifier for this step instance
     params: Dict[str, Any] = {}
     depends_on: List[str] = []
     # Auto-generated dependencies based on IO requirements
