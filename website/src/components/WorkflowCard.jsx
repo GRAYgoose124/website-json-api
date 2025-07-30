@@ -1,8 +1,8 @@
 import React from 'react';
-import { Clock, Activity, CheckCircle, AlertCircle, X, ArrowRight } from 'lucide-react';
+import { Clock, Activity, CheckCircle, AlertCircle, X, ArrowRight, Copy, Check } from 'lucide-react';
 import WorkflowChain from './WorkflowChain';
 
-const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating, dependencies }) => {
+const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating, dependencies, onCopy }) => {
   const statusColors = {
     pending: 'text-gray-400 bg-gray-500/20 border-gray-500/30',
     running: 'text-blue-400 bg-blue-500/20 border-blue-500/30',
@@ -62,9 +62,21 @@ const WorkflowCard = ({ workflow, onSelect, isSelected, isAutoUpdating, dependen
             <h3 className="font-semibold text-sm truncate mb-0.5 content-wrap">{workflow.definition.name}</h3>
             <p className="text-xs text-gray-400 line-clamp-1 content-wrap">{workflow.definition.description}</p>
           </div>
-          <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium border ${statusColors[workflow.status]}`}>
-            {statusIcons[workflow.status]}
-            <span className="capitalize">{workflow.status}</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCopy(workflow);
+              }}
+              className="p-1 text-gray-400 hover:text-blue-400 hover:bg-blue-500/20 rounded transition-colors"
+              title="Copy workflow definition"
+            >
+              <Copy className="w-3 h-3" />
+            </button>
+            <div className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium border ${statusColors[workflow.status]}`}>
+              {statusIcons[workflow.status]}
+              <span className="capitalize">{workflow.status}</span>
+            </div>
           </div>
         </div>
 

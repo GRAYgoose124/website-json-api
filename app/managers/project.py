@@ -24,10 +24,11 @@ class ProjectManager:
         raw_token = f"{project_id}_{datetime.now(UTC).isoformat()}_{uuid.uuid4()}"
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         
-        # Store project info
+        # Store project info with relative path
         project_info = {
             'project_id': project_id,
             'project_path': str(project_path),
+            'project_path_relative': str(project_path.relative_to(self.projects_root)),
             'project_name': project_name,
             'description': description,
             'created_at': datetime.now(UTC).isoformat(),
@@ -52,6 +53,7 @@ class ProjectManager:
         return {
             'project_id': project_id,
             'project_path': str(project_path),
+            'project_path_relative': str(project_path.relative_to(self.projects_root)),
             'project_token': token_hash
         }
     
@@ -63,4 +65,9 @@ class ProjectManager:
         """Get project path for a valid token"""
         project_info = self.validate_token(token)
         return project_info['project_path'] if project_info else None
+    
+    def get_project_path_relative(self, token: str) -> Optional[str]:
+        """Get relative project path for a valid token (safe for API exposure)"""
+        project_info = self.validate_token(token)
+        return project_info.get('project_path_relative') if project_info else None
 

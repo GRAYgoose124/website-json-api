@@ -3,14 +3,6 @@ where = ["."]
 include = ["app*", "bundled_steps*"]
 exclude = ["tests*"]
 
-# uv set up source includes for app bundled_steps and tests
-[tool.uv.source]
-includes = [
-    "app/**",
-    "bundled_steps/**",
-    "tests/**",
-]
-
 [project]
 name = "website-json-api"
 version = "0.1.0"

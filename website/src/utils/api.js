@@ -84,6 +84,31 @@ class ApiClient {
     }
   }
 
+  // Generic HTTP methods
+  async get(endpoint) {
+    return this.request(endpoint, { method: 'GET' });
+  }
+
+  async post(endpoint, data = null) {
+    const options = { method: 'POST' };
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    return this.request(endpoint, options);
+  }
+
+  async put(endpoint, data = null) {
+    const options = { method: 'PUT' };
+    if (data) {
+      options.body = JSON.stringify(data);
+    }
+    return this.request(endpoint, options);
+  }
+
+  async delete(endpoint) {
+    return this.request(endpoint, { method: 'DELETE' });
+  }
+
   // Authentication
   async login(username, password) {
     const formData = new FormData();
@@ -150,6 +175,17 @@ class ApiClient {
     });
     console.log('[apiClient.createWorkflow] Received response:', result);
     return result;
+  }
+
+  async copyWorkflow(workflowId, newName = null) {
+    const params = newName ? `?new_name=${encodeURIComponent(newName)}` : '';
+    return this.request(`/workflows/${workflowId}/copy${params}`, {
+      method: 'POST',
+    });
+  }
+
+  async getWorkflowDefinition(workflowId) {
+    return this.request(`/workflows/${workflowId}/definition`);
   }
 
   async validateWorkflow(definition) {

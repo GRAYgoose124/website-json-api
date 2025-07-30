@@ -24,6 +24,7 @@ async def create_project(params: Dict[str, Any], context: StepContext):
     
     project_id = project_info['project_id']
     project_path = project_info['project_path']
+    project_path_relative = project_info['project_path_relative']
     project_token = project_info['project_token']
     
     await context.info("Project ID Generated", f"Project ID: {project_id}")
@@ -33,6 +34,7 @@ async def create_project(params: Dict[str, Any], context: StepContext):
     return {
         'project_id': project_id,
         'project_path': project_path,
+        'project_path_relative': project_path_relative,
         'project_token': project_token
     }
 
@@ -232,6 +234,7 @@ async def validate_project_token(params: Dict[str, Any], context: StepContext):
             'is_valid': True,
             'project_id': project_info['project_id'],
             'project_path': project_info['project_path'],
+            'project_path_relative': project_info.get('project_path_relative'),
             'validation_message': f"Token is valid for project: {project_info['project_name']}"
         }
     else:
@@ -241,6 +244,7 @@ async def validate_project_token(params: Dict[str, Any], context: StepContext):
             'is_valid': False,
             'project_id': None,
             'project_path': None,
+            'project_path_relative': None,
             'validation_message': "Project token is invalid or expired"
         }
 

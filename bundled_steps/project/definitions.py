@@ -40,13 +40,19 @@ STEP_DEFINITIONS = {
                     required=True
                 ),
                 IOSchema(
+                    name="project_path_relative",
+                    type=DataType.STRING,
+                    description="Relative path to the project directory (safe for API exposure)",
+                    required=True
+                ),
+                IOSchema(
                     name="project_token",
                     type=DataType.STRING,
                     description="Hashed project token for future access",
                     required=True
                 )
             ],
-            context_keys=["project_id", "project_path", "project_token"]
+            context_keys=["project_id", "project_path", "project_path_relative", "project_token"]
         )
     ),
     
@@ -219,13 +225,19 @@ STEP_DEFINITIONS = {
                     required=False
                 ),
                 IOSchema(
+                    name="project_path_relative",
+                    type=DataType.STRING,
+                    description="Relative project path if token is valid (safe for API exposure)",
+                    required=False
+                ),
+                IOSchema(
                     name="validation_message",
                     type=DataType.STRING,
                     description="Validation result message",
                     required=True
                 )
             ],
-            context_keys=["is_valid", "project_id", "project_path", "validation_message"]
+            context_keys=["is_valid", "project_id", "project_path", "project_path_relative", "validation_message"]
         )
     ),
     

@@ -640,6 +640,27 @@ export default function App() {
     return isStepFailed(stepId, workflow);
   };
 
+  // Handle workflow copying
+  const handleCopyWorkflow = async (workflow) => {
+    try {
+      const response = await apiClient.get(`/workflows/${workflow.id}/definition`);
+      const workflowDefinition = response.definition;
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(JSON.stringify(workflowDefinition, null, 2));
+      
+      // Show success notice
+      console.log('Workflow definition copied to clipboard');
+      
+      // You could also show a toast notification here
+      alert('Workflow definition copied to clipboard! You can now paste it to recreate the workflow.');
+      
+    } catch (error) {
+      console.error('Failed to copy workflow:', error);
+      alert('Failed to copy workflow definition');
+    }
+  };
+
   // Get workflow context based on selected steps
   const getCurrentWorkflowContext = () => {
     return getWorkflowContext(selectedWorkflow);
@@ -975,6 +996,7 @@ export default function App() {
                     isSelected={selectedWorkflow?.id === workflow.id}
                     isAutoUpdating={!!workflowPollingRef.current && autoUpdateEnabled}
                     dependencies={workflowDependencies[workflow.id]}
+                    onCopy={handleCopyWorkflow}
                   />
                 ))
               )}

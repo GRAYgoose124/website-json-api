@@ -202,48 +202,79 @@ async def create_workflow(
     workflow_engine = Depends(get_workflow_engine),
     step_registry = Depends(get_step_registry)
 ):
-    """Create and execute a new workflow."""
-    # Validate workflow definition
+    """Create and start a new workflow, processing any temporary uploads."""
     try:
-        dependency_resolver = step_registry.dependency_resolver
-        if not dependency_resolver:
-            # Create a dependency resolver if not available
-            from app.dependency_resolver import DependencyResolver
-            dependency_resolver = DependencyResolver()
+        # Process temporary uploads before creating workflow
+        temp_uploads_dir = app.state.uploads_dir / "temp"
+        session_id = user_info.get('username', 'anonymous')
         
-        resolution = dependency_resolver.resolve_dependencies(definition)
+        if temp_uploads_dir.exists():
+            # Move temporary files to final uploads directory
+            final_uploads_dir = app.state.uploads_dir
+            final_uploads_dir.mkdir(exist_ok=True)
+            
+            for temp_file in temp_uploads_dir.glob(f"{session_id}_*"):
+                if temp_file.is_file():
+                    # Move to final location
+                    final_file = final_uploads_dir / temp_file.name
+                    temp_file.rename(final_file)
+                    
+                    # Update any file_path references in the workflow definition
+                    temp_path = str(temp_file)
+                    final_path = str(final_file)
+                    
+                    # Update step parameters that reference the temp file
+                    for step in definition.steps:
+                        if 'file_path' in step.params and step.params['file_path'] == temp_path:
+                            step.params['file_path'] = final_path
         
-        if resolution.cycles:
+        # Validate workflow definition
+        try:
+            dependency_resolver = step_registry.dependency_resolver
+            if not dependency_resolver:
+                # Create a dependency resolver if not available
+                from app.dependency_resolver import DependencyResolver
+                dependency_resolver = DependencyResolver()
+            
+            resolution = dependency_resolver.resolve_dependencies(definition)
+            
+            if resolution.cycles:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Workflow has circular dependencies: {resolution.cycles}"
+                )
+            
+            if resolution.missing_dependencies:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Missing dependencies: {resolution.missing_dependencies}"
+                )
+            
+        except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Workflow has circular dependencies: {resolution.cycles}"
+                detail=f"Workflow validation failed: {str(e)}"
             )
         
-        if resolution.missing_dependencies:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Missing dependencies: {resolution.missing_dependencies}"
-            )
+        # Create workflow instance
+        workflow = WorkflowInstance(
+            definition=definition,
+            status=WorkflowStatus.PENDING
+        )
+        
+        # Add to workflow engine
+        workflow_engine.workflows[workflow.id] = workflow
+        
+        # Execute workflow in background
+        background_tasks.add_task(workflow_engine.execute_workflow, workflow)
+        
+        return workflow
         
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Workflow validation failed: {str(e)}"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create workflow: {str(e)}"
         )
-    
-    # Create workflow instance
-    workflow = WorkflowInstance(
-        definition=definition,
-        status=WorkflowStatus.PENDING
-    )
-    
-    # Add to workflow engine
-    workflow_engine.workflows[workflow.id] = workflow
-    
-    # Execute workflow in background
-    background_tasks.add_task(workflow_engine.execute_workflow, workflow)
-    
-    return workflow
 
 
 @app.post("/workflows/validate")
@@ -353,6 +384,72 @@ async def list_workflows(
     return await get_active_workflows(status, workflow_engine)
 
 
+@app.post("/workflows/{workflow_id}/copy")
+async def copy_workflow(
+    workflow_id: str,
+    new_name: Optional[str] = None,
+    user_info: Dict[str, Any] = Depends(verify_api_token),
+    workflow_engine: WorkflowEngine = Depends(get_workflow_engine)
+):
+    """Copy an existing workflow with a new name."""
+    # Get the original workflow
+    original_workflow = workflow_engine.get_workflow(workflow_id)
+    if not original_workflow:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workflow {workflow_id} not found"
+        )
+    
+    # Create a copy of the workflow definition
+    import copy
+    copied_definition = copy.deepcopy(original_workflow.definition)
+    
+    # Update the name if provided
+    if new_name:
+        copied_definition.name = new_name
+    else:
+        copied_definition.name = f"{copied_definition.name} (Copy)"
+    
+    # Create a new workflow instance with the copied definition
+    new_workflow = WorkflowInstance(
+        definition=copied_definition,
+        status=WorkflowStatus.PENDING
+    )
+    
+    # Add to workflow engine
+    workflow_engine.workflows[new_workflow.id] = new_workflow
+    
+    return {
+        "message": "Workflow copied successfully",
+        "original_workflow_id": workflow_id,
+        "new_workflow_id": new_workflow.id,
+        "new_workflow_name": new_workflow.definition.name,
+        "workflow_definition": copied_definition.model_dump()
+    }
+
+
+@app.get("/workflows/{workflow_id}/definition")
+async def get_workflow_definition(
+    workflow_id: str,
+    user_info: Dict[str, Any] = Depends(verify_api_token),
+    workflow_engine: WorkflowEngine = Depends(get_workflow_engine)
+):
+    """Get workflow definition as JSON for copying/pasting."""
+    workflow = workflow_engine.get_workflow(workflow_id)
+    if not workflow:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Workflow {workflow_id} not found"
+        )
+    
+    return {
+        "workflow_id": workflow_id,
+        "workflow_name": workflow.definition.name,
+        "definition": workflow.definition.model_dump(),
+        "copy_paste_format": True
+    }
+
+
 # Step-specific endpoints with context injection
 @app.get("/workflows/{workflow_id}/steps/{step_id}/context")
 async def get_step_context(
@@ -456,25 +553,28 @@ async def upload_file(
     file: UploadFile,
     user_info: Dict[str, Any] = Depends(verify_api_token)
 ):
-    """Upload a file and return the file path."""
+    """Upload a file to temporary storage and return a temporary file path."""
     try:
-        uploads_dir = app.state.uploads_dir
-        uploads_dir.mkdir(exist_ok=True)
+        # Create temporary uploads directory
+        temp_uploads_dir = app.state.uploads_dir / "temp"
+        temp_uploads_dir.mkdir(parents=True, exist_ok=True)
         
-        # Create a unique filename
+        # Create a unique filename with session identifier
         timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
-        filename = f"{timestamp}_{file.filename}"
-        file_path = uploads_dir / filename
+        session_id = user_info.get('username', 'anonymous')
+        filename = f"{session_id}_{timestamp}_{file.filename}"
+        temp_file_path = temp_uploads_dir / filename
         
-        # Save the uploaded file
-        with open(file_path, "wb") as buffer:
+        # Save the uploaded file to temporary location
+        with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
         return {
             "success": True,
-            "file_path": str(file_path),
+            "temp_file_path": str(temp_file_path),
             "filename": file.filename,
-            "size": file_path.stat().st_size
+            "size": temp_file_path.stat().st_size,
+            "session_id": session_id
         }
     except Exception as e:
         raise HTTPException(
