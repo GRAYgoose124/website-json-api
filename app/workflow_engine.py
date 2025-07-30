@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime, UTC
 from app.models import WorkflowInstance, WorkflowStatus, WorkflowStep, DependencyResolution, Notice, NoticeType, NoticeSeverity
 from app.step.registry import StepRegistry
@@ -12,6 +12,27 @@ class WorkflowEngine:
         self.notice_manager = notice_manager
         self.workflows: Dict[str, WorkflowInstance] = {}
     
+    def get_workflow(self, workflow_id: str) -> Optional[WorkflowInstance]:
+        """Get a workflow instance by ID."""
+        return self.workflows.get(workflow_id)
+    
+    def list_workflows(self, status_filter: Optional[WorkflowStatus] = None) -> List[WorkflowInstance]:
+        """List workflows with optional status filtering."""
+        workflows = list(self.workflows.values())
+        if status_filter:
+            workflows = [w for w in workflows if w.status == status_filter]
+        return workflows
+    
+    @property
+    def active_workflows(self) -> List[WorkflowInstance]:
+        """Get all active workflows."""
+        return [w for w in self.workflows.values() if w.status in [WorkflowStatus.PENDING, WorkflowStatus.RUNNING]]
+    
+    @property
+    def completed_workflows(self) -> List[WorkflowInstance]:
+        """Get all completed workflows."""
+        return [w for w in self.workflows.values() if w.status in [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED, WorkflowStatus.CANCELLED]]
+
     async def execute_workflow(self, workflow: WorkflowInstance):
         """Execute a workflow with proper project isolation"""
         try:

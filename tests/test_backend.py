@@ -24,7 +24,7 @@ class ServerManager:
             self.port = port
         self.process = None
         self.base_url = f"http://localhost:{self.port}"
-        self.test_userdata_dir = Path("./test-userdata")
+        self.test_userdata_dir = Path("./tests/userdata")
     
     async def start(self):
         """Start the test server"""
@@ -38,7 +38,7 @@ class ServerManager:
         cmd = [
             "uv", "run", "main.py",
             "--port", str(self.port),
-            "--userdata-root", "./test-userdata",
+            "--userdata-root", str(self.test_userdata_dir),
             "--include-steps-root", "./bundled_steps/project",
             "--include-steps-root", "./bundled_steps/custom",
             "--host", "127.0.0.1"

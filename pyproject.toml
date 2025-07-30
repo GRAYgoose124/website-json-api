@@ -1,3 +1,16 @@
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "bundled_steps*"]
+exclude = ["tests*"]
+
+# uv set up source includes for app bundled_steps and tests
+[tool.uv.source]
+includes = [
+    "app/**",
+    "bundled_steps/**",
+    "tests/**",
+]
+
 [project]
 name = "website-json-api"
 version = "0.1.0"
@@ -5,11 +18,8 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "aiohttp>=3.12.14",
     "fastapi>=0.116.1",
     "psutil>=7.0.0",
-    "pytest>=8.4.1",
-    "pytest-asyncio>=1.1.0",
     "python-multipart>=0.0.20",
     "requests>=2.32.4",
     "uvicorn>=0.35.0",
@@ -20,4 +30,7 @@ dependencies = [
 dev = [
     "aiohttp>=3.12.14",
     "pytest>=8.4.1",
+    "httpx>=0.28.1",
+    "pyjwt>=2.10.1",
+    "pytest-asyncio>=1.1.0",
 ]
