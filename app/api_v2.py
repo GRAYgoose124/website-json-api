@@ -211,6 +211,22 @@ async def get_step_tags(step_registry = Depends(get_step_registry)):
     return {"tags": sorted(list(all_tags))}
 
 
+@app.get("/steps/{step_id}", response_model=StepDefinition)
+async def get_step_details(
+    step_id: str,
+    user_info: Dict[str, Any] = Depends(verify_api_token),
+    step_registry = Depends(get_step_registry)
+):
+    """Get details for a specific step by ID."""
+    step_definition = step_registry.definitions.get(step_id)
+    if not step_definition:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Step '{step_id}' not found"
+        )
+    return step_definition
+
+
 # Workflow management with improved dependency injection
 @app.post("/workflows", response_model=WorkflowInstance)
 async def create_workflow(

@@ -306,9 +306,13 @@ describe('API Integration Tests', () => {
       
       if (stepIds.length > 0) {
         const stepId = stepIds[0];
-        // Skip individual step details test since the endpoint doesn't exist
-        console.log(`⚠️  Skipping individual step details test for ${stepId} - endpoint not available`);
-        expect(stepIds.length).toBeGreaterThan(0); // Just verify we have steps
+        // Now test the individual step details endpoint
+        const stepDetails = await apiClient.get(`/steps/${stepId}`);
+        expect(stepDetails).toBeDefined();
+        expect(stepDetails.id).toBe(stepId);
+        expect(stepDetails.name).toBeDefined();
+        expect(stepDetails.description).toBeDefined();
+        expect(stepDetails.callback).toBeDefined();
       } else {
         expect(stepIds.length).toBeGreaterThan(0); // Should have at least one step
       }
@@ -377,23 +381,49 @@ describe('API Integration Tests', () => {
 
   describe('File Upload', () => {
     test('should upload a file', async () => {
-      // Skip this test for now due to FormData issues in Node.js environment
-      // TODO: Implement proper file upload test with Node.js compatible FormData
-      console.log('⚠️  Skipping file upload test due to FormData compatibility issues in Node.js');
-      expect(true).toBe(true); // Placeholder assertion
+      // Create a test file using Node.js FormData
+      const FormData = require('form-data');
+      const fs = require('fs');
+      const path = require('path');
       
-      /*
-      // Create a test file
+      // Create a temporary test file
       const testContent = 'This is a test file for integration testing';
-      const testFile = new File([testContent], 'test-integration.txt', { 
-        type: 'text/plain' 
-      });
-
-      const result = await apiClient.uploadFile(testFile);
-      expect(result).toBeDefined();
-      expect(result.success).toBe(true);
-      expect(result.temp_file_path).toBeDefined();
-      */
+      const tempFilePath = path.join(require('os').tmpdir(), 'test-integration.txt');
+      fs.writeFileSync(tempFilePath, testContent);
+      
+      try {
+        // Create FormData and append the file
+        const formData = new FormData();
+        formData.append('file', fs.createReadStream(tempFilePath), {
+          filename: 'test-integration.txt',
+          contentType: 'text/plain'
+        });
+        
+        // Make the upload request
+        const response = await fetch(`${apiClient.baseUrl}/upload-file`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiClient.authToken}`,
+            ...formData.getHeaders()
+          },
+          body: formData
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Upload failed: ${response.status} - ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        expect(result).toBeDefined();
+        expect(result.success).toBe(true);
+        expect(result.temp_file_path).toBeDefined();
+        
+      } finally {
+        // Clean up temporary file
+        if (fs.existsSync(tempFilePath)) {
+          fs.unlinkSync(tempFilePath);
+        }
+      }
     });
   });
 
