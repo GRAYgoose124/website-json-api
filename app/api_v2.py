@@ -31,7 +31,7 @@ from .managers.notice import NoticeManager
 from .workflow_engine import WorkflowEngine
 from .step.registry import StepRegistry
 
-# Create FastAPI app
+# Create FastAPI app (will be redefined with lifespan)
 app = FastAPI(
     title="Scientific Workflow API v2",
     description="Improved API with dependency injection and context management",
@@ -49,10 +49,8 @@ app.add_middleware(
 )
 
 
-# Startup event to initialize the application
-@app.on_event("startup")
-async def startup_event():
-    """Initialize the application on startup."""
+def initialize_app_core():
+    """Initialize the application core components."""
     print("🚀 Initializing Scientific Workflow API v2...")
     
     # Initialize core components
@@ -65,7 +63,36 @@ async def startup_event():
     app.state.init_result = init_result
     app.state.uploads_dir = Path(init_result["uploads_dir"])
     
+    # Store core instances in app state for dependency injection
+    from app.core import project_manager, notice_manager, step_registry, workflow_engine, dependency_resolver
+    app.state.project_manager = project_manager
+    app.state.notice_manager = notice_manager
+    app.state.step_registry = step_registry
+    app.state.workflow_engine = workflow_engine
+    app.state.dependency_resolver = dependency_resolver
+    
     print(f"✅ API initialized with {init_result['total_steps']} steps")
+    return init_result
+
+# Use lifespan context manager instead of deprecated on_event
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for application startup and shutdown."""
+    # Startup
+    initialize_app_core()
+    yield
+    # Shutdown (if needed)
+    pass
+
+# Update app to use lifespan
+app = FastAPI(
+    title="Scientific Workflow API v2",
+    description="Improved API with dependency injection and context management",
+    version="2.0.0",
+    lifespan=lifespan
+)
 
 
 # Health and status endpoints

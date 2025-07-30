@@ -80,7 +80,7 @@ class WorkflowEngine:
                             await context.error("Step Failed", f"Step {step_id} failed: {self._get_step_failure_message(result)}")
                             workflow.status = WorkflowStatus.FAILED
                             workflow.completed_at = datetime.now(UTC)
-                            return
+                            return workflow
                         
                         # Update workflow context with step outputs
                         self._update_workflow_context(workflow, step_id, result)
@@ -89,7 +89,7 @@ class WorkflowEngine:
                         await context.error("Step Failed", f"Step {step_id} failed: {str(e)}")
                         workflow.status = WorkflowStatus.FAILED
                         workflow.completed_at = datetime.now(UTC)
-                        return
+                        return workflow
             
             workflow.status = WorkflowStatus.COMPLETED
             workflow.completed_at = datetime.now(UTC)
@@ -102,12 +102,18 @@ class WorkflowEngine:
                 severity=NoticeSeverity.HIGH,
                 title="Workflow Failed",
                 message=f"Workflow execution failed: {str(e)}",
-                workflow_id=workflow.id
+                workflow_id=workflow.id,
+                step_id=None
             ))
+        
+        return workflow
     
     def _prepare_step_params(self, step: WorkflowStep, context: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare step parameters, filling in context values where needed"""
         params = step.params.copy()
+        
+        # Resolve template variables in parameters
+        params = self._resolve_template_variables(params, context)
         
         # For project steps, handle special cases
         if step.step_id == "create_project":
@@ -124,6 +130,36 @@ class WorkflowEngine:
                 params[param_name] = context[param_name]
         
         return params
+    
+    def _resolve_template_variables(self, params: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Resolve template variables like {{step_id.field}} in parameters"""
+        import re
+        
+        resolved_params = {}
+        for key, value in params.items():
+            if isinstance(value, str):
+                # Find all template variables in the string
+                template_pattern = r'\{\{([^}]+)\}\}'
+                matches = re.findall(template_pattern, value)
+                
+                if matches:
+                    resolved_value = value
+                    for match in matches:
+                        # Parse the template variable (e.g., "create_project.project_token")
+                        parts = match.strip().split('.')
+                        if len(parts) == 2:
+                            step_id, field = parts
+                            # Look for the field in the context
+                            if field in context:
+                                resolved_value = resolved_value.replace(f'{{{{{match}}}}}', str(context[field]))
+                    
+                    resolved_params[key] = resolved_value
+                else:
+                    resolved_params[key] = value
+            else:
+                resolved_params[key] = value
+        
+        return resolved_params
     
     def _update_workflow_context(self, workflow: WorkflowInstance, step_id: str, result: Dict[str, Any]):
         """Update workflow context with step results"""

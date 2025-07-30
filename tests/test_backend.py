@@ -105,7 +105,8 @@ class ServerManager:
             attempts += 1
             try:
                 async with aiohttp.ClientSession() as session:
-                    async with session.get(f"{self.base_url}/steps", timeout=2) as response:
+                    # Use /health endpoint which doesn't require authentication
+                    async with session.get(f"{self.base_url}/health", timeout=2) as response:
                         if response.status == 200:
                             print(f"✅ Server is ready after {attempts} attempts!")
                             return
@@ -134,6 +135,24 @@ async def test_backend_api(test_server):
     
     async with aiohttp.ClientSession() as session:
         print("🧪 Testing Backend API...")
+        
+        # Test 0: Authenticate first
+        print("\n0. Authenticating...")
+        auth_data = aiohttp.FormData()
+        auth_data.add_field('username', 'test_user')
+        auth_data.add_field('password', 'test_password')
+        
+        async with session.post(f"{base_url}/auth/login", data=auth_data) as response:
+            if response.status == 200:
+                auth_result = await response.json()
+                auth_token = auth_result['access_token']
+                print(f"✅ Authenticated successfully")
+            else:
+                print(f"❌ Authentication failed: {response.status}")
+                return False
+        
+        # Add authorization header to session
+        session.headers.update({'Authorization': f'Bearer {auth_token}'})
         
         # Test 1: Get available steps
         print("\n1. Testing /steps endpoint...")
@@ -181,6 +200,7 @@ async def test_backend_api(test_server):
         try:
             with open(test_file.name, 'rb') as f:
                 files = {'file': ('test.txt', f, 'text/plain')}
+                # Note: aiohttp automatically includes session headers
                 async with session.post(f"{base_url}/upload-file", data=files) as response:
                     if response.status == 200:
                         upload_result = await response.json()
@@ -312,6 +332,20 @@ async def test_workflow_engine(test_server):
     base_url = test_server.base_url
     
     async with aiohttp.ClientSession() as session:
+        # Authenticate first
+        auth_data = aiohttp.FormData()
+        auth_data.add_field('username', 'test_user')
+        auth_data.add_field('password', 'test_password')
+        
+        async with session.post(f"{base_url}/auth/login", data=auth_data) as response:
+            if response.status == 200:
+                auth_result = await response.json()
+                auth_token = auth_result['access_token']
+                session.headers.update({'Authorization': f'Bearer {auth_token}'})
+            else:
+                print(f"❌ Authentication failed: {response.status}")
+                return
+        
         # Test dependency resolution
         print("Testing dependency resolution...")
         async with session.get(f"{base_url}/steps") as response:

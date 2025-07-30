@@ -25,8 +25,8 @@ from app.dependencies import (
     get_health_status, inject_workflow_context, inject_step_context,
     API_SECRET_KEY, API_ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 )
-from app.api_v2 import app
-from app.core import project_manager, notice_manager, step_registry, workflow_engine
+from app.api_v2 import app as original_app
+from app.core import initialize_core
 from datetime import UTC
 
 
@@ -338,8 +338,14 @@ class TestAPIIntegration:
     """Test the API integration with dependency injection."""
     
     @pytest.fixture
-    def client(self):
+    def client(self, initialized_core):
         """Create a test client for the API."""
+        # Import the app and initialize it for testing
+        from app.api_v2 import app, initialize_app_core
+        
+        # Initialize the app core for testing
+        initialize_app_core()
+        
         return TestClient(app)
     
     @pytest.fixture
@@ -460,8 +466,14 @@ class TestContextForwarding:
     """Test context forwarding functionality."""
     
     @pytest.fixture
-    def client(self):
+    def client(self, initialized_core):
         """Create a test client for the API."""
+        # Import the app and initialize it for testing
+        from app.api_v2 import app, initialize_app_core
+        
+        # Initialize the app core for testing
+        initialize_app_core()
+        
         return TestClient(app)
     
     @pytest.fixture
@@ -501,8 +513,14 @@ class TestErrorHandling:
     """Test error handling in the dependency injection system."""
     
     @pytest.fixture
-    def client(self):
+    def client(self, initialized_core):
         """Create a test client for the API."""
+        # Import the app and initialize it for testing
+        from app.api_v2 import app, initialize_app_core
+        
+        # Initialize the app core for testing
+        initialize_app_core()
+        
         return TestClient(app)
 
     def test_invalid_token_format(self, client):
@@ -550,8 +568,14 @@ class TestPerformanceAndScalability:
     """Test performance and scalability aspects of the dependency injection system."""
     
     @pytest.fixture
-    def client(self):
+    def client(self, initialized_core):
         """Create a test client for the API."""
+        # Import the app and initialize it for testing
+        from app.api_v2 import app, initialize_app_core
+        
+        # Initialize the app core for testing
+        initialize_app_core()
+        
         return TestClient(app)
 
     def test_concurrent_token_verification(self):

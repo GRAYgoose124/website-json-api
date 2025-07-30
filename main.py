@@ -1,6 +1,6 @@
 import argparse
 import sys
-from app.api import app
+from app.api_v2 import app
 from app.core import initialize_core
 
 def main():

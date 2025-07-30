@@ -43,3 +43,7 @@ class NoticeManager:
             filtered = [n for n in filtered if n.timestamp > since]
         
         return sorted(filtered, key=lambda x: x.timestamp, reverse=True)
+    
+    def clear_notices(self):
+        """Clear all notices."""
+        self.notices.clear()

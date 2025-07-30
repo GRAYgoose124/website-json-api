@@ -13,7 +13,7 @@ from pathlib import Path
 # Add the project root to the path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.core import StepContext, project_manager, NoticeManager
+from app.core import StepContext, NoticeManager
 from app.step.loader import StepLoader
 
 class TestProjectManagement:
@@ -48,8 +48,9 @@ class TestProjectManagement:
         return StepLoader()
     
     @pytest.mark.asyncio
-    async def test_project_manager_creation(self, temp_project_dir):
+    async def test_project_manager_creation(self, temp_project_dir, project_manager_fixture):
         """Test project manager functionality"""
+        project_manager = project_manager_fixture
         # Temporarily set the projects root
         original_root = project_manager.projects_root
         project_manager.projects_root = Path(temp_project_dir)
@@ -81,8 +82,9 @@ class TestProjectManagement:
             project_manager.projects_root = original_root
     
     @pytest.mark.asyncio
-    async def test_create_project_step(self, temp_project_dir, context, step_loader):
+    async def test_create_project_step(self, temp_project_dir, context, step_loader, project_manager_fixture):
         """Test create_project step"""
+        project_manager = project_manager_fixture
         # Load step implementation
         _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']
@@ -112,8 +114,9 @@ class TestProjectManagement:
             project_manager.projects_root = original_root
     
     @pytest.mark.asyncio
-    async def test_upload_file_to_project_step(self, temp_project_dir, context, step_loader):
+    async def test_upload_file_to_project_step(self, temp_project_dir, context, step_loader, project_manager_fixture):
         """Test upload_file_to_project step"""
+        project_manager = project_manager_fixture
         # Load step implementations
         _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']
@@ -150,8 +153,9 @@ class TestProjectManagement:
             project_manager.projects_root = original_root
     
     @pytest.mark.asyncio
-    async def test_upload_file_invalid_token(self, temp_project_dir, context, step_loader):
+    async def test_upload_file_invalid_token(self, temp_project_dir, context, step_loader, project_manager_fixture):
         """Test file upload with invalid token"""
+        project_manager = project_manager_fixture
         # Load step implementation
         _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         upload_file_func = step_implementations['upload_file_to_project']
@@ -171,8 +175,9 @@ class TestProjectManagement:
         assert upload_result['file_size'] == 0
     
     @pytest.mark.asyncio
-    async def test_validate_project_token_step(self, temp_project_dir, context, step_loader):
+    async def test_validate_project_token_step(self, temp_project_dir, context, step_loader, project_manager_fixture):
         """Test validate_project_token step"""
+        project_manager = project_manager_fixture
         # Load step implementations
         _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']
@@ -209,8 +214,9 @@ class TestProjectManagement:
             project_manager.projects_root = original_root
     
     @pytest.mark.asyncio
-    async def test_list_project_files_step(self, temp_project_dir, context, step_loader):
+    async def test_list_project_files_step(self, temp_project_dir, context, step_loader, project_manager_fixture):
         """Test list_project_files step"""
+        project_manager = project_manager_fixture
         # Load step implementations
         _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']
@@ -265,8 +271,9 @@ class TestProjectManagement:
             project_manager.projects_root = original_root
     
     @pytest.mark.asyncio
-    async def test_download_project_zip_step(self, temp_project_dir, context, step_loader):
+    async def test_download_project_zip_step(self, temp_project_dir, context, step_loader, project_manager_fixture):
         """Test download_project_zip step"""
+        project_manager = project_manager_fixture
         # Load step implementations
         _, step_implementations = step_loader.load_from_path("bundled_steps/project")
         create_project_func = step_implementations['create_project']

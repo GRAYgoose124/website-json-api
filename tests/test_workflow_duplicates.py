@@ -105,8 +105,6 @@ def test_workflow_no_duplicates():
     # Print the workflow JSON for inspection
     print("\n📄 Workflow JSON:")
     print(json.dumps(workflow_dict, indent=2, default=str))
-    
-    return workflow_dict
 
 
 def test_multiple_upload_steps_no_duplicates():
@@ -179,8 +177,6 @@ def test_multiple_upload_steps_no_duplicates():
     assert len(upload_steps) == 3, f"Expected 3 upload steps, found {len(upload_steps)}"
     
     print(f"✅ Found {len(upload_steps)} upload steps without duplicates")
-    
-    return workflow_dict
 
 
 if __name__ == "__main__":

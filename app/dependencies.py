@@ -18,6 +18,10 @@ from app.step.registry import StepRegistry
 from app.managers.notice import NoticeManager
 from app.managers.project import ProjectManager
 from app.dependency_resolver import DependencyResolver
+from app.core import (
+    project_manager, notice_manager, step_registry, 
+    workflow_engine, dependency_resolver
+)
 
 # Configuration
 API_SECRET_KEY = os.getenv("API_SECRET_KEY", "your-secret-key-here")
@@ -27,28 +31,46 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
 # Security scheme
 security = HTTPBearer(auto_error=False)
 
-# Dependency injection functions
+# Dependency injection functions - use singleton instances
 def get_project_manager() -> ProjectManager:
     """Get project manager instance."""
-    return ProjectManager()
+    # Re-import to get the latest state
+    from app.core import project_manager as current_project_manager
+    if current_project_manager is None:
+        raise RuntimeError("Application not initialized. Call initialize_core() first.")
+    return current_project_manager
 
 def get_notice_manager() -> NoticeManager:
     """Get notice manager instance."""
-    return NoticeManager()
+    # Re-import to get the latest state
+    from app.core import notice_manager as current_notice_manager
+    if current_notice_manager is None:
+        raise RuntimeError("Application not initialized. Call initialize_core() first.")
+    return current_notice_manager
 
 def get_step_registry() -> StepRegistry:
     """Get step registry instance."""
-    return StepRegistry()
+    # Re-import to get the latest state
+    from app.core import step_registry as current_step_registry
+    if current_step_registry is None:
+        raise RuntimeError("Application not initialized. Call initialize_core() first.")
+    return current_step_registry
 
 def get_workflow_engine() -> WorkflowEngine:
     """Get workflow engine instance."""
-    step_registry = get_step_registry()
-    notice_manager = get_notice_manager()
-    return WorkflowEngine(step_registry, notice_manager)
+    # Re-import to get the latest state
+    from app.core import workflow_engine as current_workflow_engine
+    if current_workflow_engine is None:
+        raise RuntimeError("Application not initialized. Call initialize_core() first.")
+    return current_workflow_engine
 
 def get_dependency_resolver() -> DependencyResolver:
     """Get dependency resolver instance."""
-    return DependencyResolver()
+    # Re-import to get the latest state
+    from app.core import dependency_resolver as current_dependency_resolver
+    if current_dependency_resolver is None:
+        raise RuntimeError("Application not initialized. Call initialize_core() first.")
+    return current_dependency_resolver
 
 async def verify_api_token(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)

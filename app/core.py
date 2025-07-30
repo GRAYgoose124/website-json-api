@@ -9,11 +9,13 @@ from .step.loader import StepLoader
 from .workflow_engine import WorkflowEngine
 from .dependency_resolver import DependencyResolver
 
-# Global instances
-project_manager = ProjectManager()
-notice_manager = NoticeManager()
-step_registry = StepRegistry()
-workflow_engine = WorkflowEngine(step_registry, notice_manager)
+# Global instances - these will be properly initialized
+project_manager = None
+notice_manager = None
+step_registry = None
+step_loader = None
+workflow_engine = None
+dependency_resolver = None
 
 def initialize_core(userdata_root: str, step_paths: List[str]) -> Dict[str, Any]:
     """
@@ -26,6 +28,8 @@ def initialize_core(userdata_root: str, step_paths: List[str]) -> Dict[str, Any]
     Returns:
         Dict containing initialization results and statistics
     """
+    global project_manager, notice_manager, step_registry, step_loader, workflow_engine, dependency_resolver
+    
     # Create userdata root directory
     userdata_root_path = Path(userdata_root).resolve()
     userdata_root_path.mkdir(parents=True, exist_ok=True)
@@ -36,11 +40,19 @@ def initialize_core(userdata_root: str, step_paths: List[str]) -> Dict[str, Any]
     uploads_dir.mkdir(exist_ok=True)
     projects_dir.mkdir(exist_ok=True)
     
+    # Initialize global instances
+    project_manager = ProjectManager()
+    notice_manager = NoticeManager()
+    step_registry = StepRegistry()
+    step_loader = StepLoader()
+    # Initialize dependency resolver after steps are loaded
+    dependency_resolver = None
+    
     # Configure project manager with projects directory
     project_manager.projects_root = projects_dir
     print(f"Using projects directory: {project_manager.projects_root}")
     
-    # Load steps from all specified paths
+    # Load steps from all specified paths using the singleton StepLoader
     all_step_definitions = {}
     all_step_implementations = {}
     
@@ -49,8 +61,7 @@ def initialize_core(userdata_root: str, step_paths: List[str]) -> Dict[str, Any]
         print(f"  - {step_path}")
         
         try:
-            # Create a fresh StepLoader for each path to avoid state accumulation
-            step_loader = StepLoader()
+            # Use the singleton StepLoader to load steps
             step_definitions, step_implementations = step_loader.load_from_path(step_path)
             
             # Merge step definitions and implementations
@@ -80,7 +91,7 @@ def initialize_core(userdata_root: str, step_paths: List[str]) -> Dict[str, Any]
             print(f"  - No implementation found for step: {step_id}")
         raise ValueError(f"Missing implementations for steps: {missing_implementations}")
     
-    # Register all loaded steps
+    # Register all loaded steps in the registry
     for step_id, definition in all_step_definitions.items():
         if step_id in all_step_implementations:
             step_registry.register(definition)(all_step_implementations[step_id])
@@ -88,10 +99,14 @@ def initialize_core(userdata_root: str, step_paths: List[str]) -> Dict[str, Any]
         else:
             print(f"Warning: No implementation found for step: {step_id}")
     
-    # Initialize dependency resolver after steps are registered
+    # Initialize dependency resolver with step definitions and set it in the registry
     dependency_resolver = DependencyResolver(step_registry.definitions)
     step_registry.set_dependency_resolver(dependency_resolver)
     print("Dependency resolver initialized")
+    
+    # Initialize workflow engine with the registry and notice manager
+    workflow_engine = WorkflowEngine(step_registry, notice_manager)
+    print("Workflow engine initialized")
     
     print(f"Successfully loaded {len(all_step_definitions)} step definitions")
     
@@ -110,10 +125,14 @@ __all__ = [
     'NoticeManager', 
     'StepRegistry',
     'StepContext',
+    'StepLoader',
     'WorkflowEngine',
+    'DependencyResolver',
     'initialize_core',
     'project_manager',
     'notice_manager',
     'step_registry',
-    'workflow_engine'
+    'step_loader',
+    'workflow_engine',
+    'dependency_resolver'
 ] 

@@ -123,4 +123,9 @@ class DependencyResolution(BaseModel):
     dependents: Dict[str, List[str]]  # Step ID -> list of dependents
     cycles: List[List[str]] = Field(default_factory=list)  # Circular dependencies
     missing_dependencies: List[str] = Field(default_factory=list)  # Steps that can't be resolved
-    context_flow: Dict[str, Dict[str, str]] = Field(default_factory=dict)  # Step ID -> {context_key -> provider_step_id} 
+    context_flow: Dict[str, Dict[str, str]] = Field(default_factory=dict)  # Step ID -> {context_key -> provider_step_id}
+    
+    @property
+    def is_valid(self) -> bool:
+        """Check if the dependency resolution is valid (no cycles or missing dependencies)"""
+        return len(self.cycles) == 0 and len(self.missing_dependencies) == 0 
