@@ -1,0 +1,4 @@
+- projects/.index.dat 
+- backend project_paths need to be relative to the userdata_root / projects folder (not absolute, to avoid exposing fs to api)
+- uploads should only happen after workflow is submitted and not during ui interaction
+- should be able to copy workflows we create in the ui to paste and rerun them

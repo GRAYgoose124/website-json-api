@@ -56,7 +56,7 @@ const StepConfiguration = ({ step, stepDefinition, onUpdate, onRemove, workflowC
     const autoFilled = isAutoFilled(input.name);
     
     // If auto-filled, show the context value instead
-    const displayValue = autoFilled ? workflowContext[input.name] : value;
+    const displayValue = autoFilled ? (workflowContext[input.name] ?? '') : (value ?? '');
     
     // Check if this is a file path input
     const isFilePath = input.name === 'file_path' || 

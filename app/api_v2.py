@@ -439,7 +439,7 @@ async def websocket_notices(
     try:
         # Send initial notices
         notices = notice_manager.get_notices()
-        await websocket.send_json({"type": "notices", "data": [n.model_dump() for n in notices]})
+        await websocket.send_json({"type": "notices", "data": [n.model_dump(mode='json') for n in notices]})
         
         # Keep connection alive and send updates
         while True:

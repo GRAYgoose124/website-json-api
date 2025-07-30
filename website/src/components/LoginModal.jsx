@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Lock, AlertCircle } from 'lucide-react';
+import apiClient from '../utils/api.js';
 
 const LoginModal = ({ isOpen, onLogin, onClose }) => {
   const [username, setUsername] = useState('');
@@ -13,25 +14,10 @@ const LoginModal = ({ isOpen, onLogin, onClose }) => {
     setError('');
 
     try {
-      const formData = new FormData();
-      formData.append('username', username);
-      formData.append('password', password);
-
-      const response = await fetch('http://localhost:8002/auth/login', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('authToken', data.access_token);
-        onLogin(data.access_token);
-      } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Login failed');
-      }
+      const data = await apiClient.login(username, password);
+      onLogin(data.access_token);
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError(err.message || 'Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }

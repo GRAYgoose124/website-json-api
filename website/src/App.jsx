@@ -17,7 +17,26 @@ import LoadingSpinner from './components/LoadingSpinner';
 import StepDependencies from './components/StepDependencies';
 import LoginModal from './components/LoginModal';
 
-const API_BASE = 'http://localhost:8002';
+// Import utilities
+import apiClient from './utils/api.js';
+import { WorkflowStatus, NoticeType, StatusColors, NoticeTypeColors } from './utils/constants.js';
+import { 
+  isStepFailed, 
+  getStepStatus, 
+  getWorkflowProgress, 
+  formatWorkflowDuration,
+  createWorkflowStep,
+  buildWorkflowDefinition,
+  validateWorkflowDefinition,
+  getWorkflowContext,
+  resolveTemplateVariables,
+  sortWorkflows,
+  filterWorkflowsByStatus,
+  getWorkflowNotices,
+  formatNoticeTimestamp,
+  isNoticeDismissible,
+  shouldAutoDismissNotice
+} from './utils/workflowUtils.js';
 
 // Main App Component
 export default function App() {
@@ -30,7 +49,7 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [connectionError, setConnectionError] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isCreatingWorkflow, setIsCreatingWorkflow] = useState(false);
   const [lastWorkflowUpdate, setLastWorkflowUpdate] = useState(null);
   const [autoUpdateEnabled, setAutoUpdateEnabled] = useState(true);
@@ -41,8 +60,45 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [authToken, setAuthToken] = useState(localStorage.getItem('authToken'));
+  const [authToken, setAuthToken] = useState(apiClient.authToken);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const processedDownloadWorkflowsRef = useRef(new Set());
+  
+  // Load processed workflows from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('processedDownloadWorkflows');
+    if (stored) {
+      try {
+        const workflows = JSON.parse(stored);
+        processedDownloadWorkflowsRef.current = new Set(workflows);
+      } catch (error) {
+        console.error('Failed to parse stored processed workflows:', error);
+      }
+    }
+    
+    // Clean up old entries (keep only last 100)
+    const cleanupProcessedWorkflows = () => {
+      const workflows = [...processedDownloadWorkflowsRef.current];
+      if (workflows.length > 100) {
+        const recentWorkflows = workflows.slice(-100);
+        processedDownloadWorkflowsRef.current = new Set(recentWorkflows);
+        localStorage.setItem('processedDownloadWorkflows', JSON.stringify(recentWorkflows));
+      }
+    };
+    
+    cleanupProcessedWorkflows();
+  }, []);
+  
+  // Save processed workflows to localStorage whenever it changes
+  const addProcessedWorkflow = useCallback((workflowId) => {
+    processedDownloadWorkflowsRef.current.add(workflowId);
+    localStorage.setItem('processedDownloadWorkflows', 
+      JSON.stringify([...processedDownloadWorkflowsRef.current]));
+  }, []);
+  
+  // Track page load time to avoid processing old downloads
+  const pageLoadTimeRef = useRef(Date.now());
+
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
@@ -68,7 +124,7 @@ export default function App() {
         ]);
       } catch (error) {
         console.error('Failed to initialize app:', error);
-        if (error.status === 401) {
+        if (error.message === 'Authentication required') {
           setShowLoginModal(true);
         }
       } finally {
@@ -91,9 +147,11 @@ export default function App() {
 
   // Start automatic workflow polling
   const startWorkflowPolling = () => {
-    workflowPollingRef.current = setInterval(() => {
+    workflowPollingRef.current = setInterval(async () => {
       if (autoUpdateEnabled) {
-        fetchWorkflows();
+        await fetchWorkflows();
+        // Also check for downloads in completed workflows
+        await checkForDownloadsInCompletedWorkflows();
       }
     }, 2000);
   };
@@ -117,22 +175,15 @@ export default function App() {
 
   const fetchSteps = async () => {
     try {
-      console.log('Fetching steps from:', `${API_BASE}/steps`);
-      const res = await fetch(`${API_BASE}/steps`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const stepsData = await res.json();
-        console.log('Fetched steps:', stepsData);
-        setSteps(stepsData);
-      } else if (res.status === 401) {
-        throw { status: 401 };
-      } else {
-        console.error('Failed to fetch steps:', await res.text());
-      }
+      console.log('Fetching steps...');
+      const filters = {};
+      if (selectedCategory) filters.category = selectedCategory;
+      if (selectedTag) filters.tag = selectedTag;
+      if (searchQuery) filters.search = searchQuery;
+      
+      const stepsData = await apiClient.getSteps(filters);
+      console.log('Fetched steps:', stepsData);
+      setSteps(stepsData);
     } catch (error) {
       console.error('Error fetching steps:', error);
       throw error;
@@ -141,18 +192,8 @@ export default function App() {
 
   const fetchStepCategories = async () => {
     try {
-      const res = await fetch(`${API_BASE}/steps/categories`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const categories = await res.json();
-        setStepCategories(categories);
-      } else if (res.status === 401) {
-        throw { status: 401 };
-      }
+      const categories = await apiClient.getStepCategories();
+      setStepCategories(categories.categories || []);
     } catch (error) {
       console.error('Error fetching step categories:', error);
       throw error;
@@ -161,18 +202,8 @@ export default function App() {
 
   const fetchStepTags = async () => {
     try {
-      const res = await fetch(`${API_BASE}/steps/tags`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const tags = await res.json();
-        setStepTags(tags);
-      } else if (res.status === 401) {
-        throw { status: 401 };
-      }
+      const tags = await apiClient.getStepTags();
+      setStepTags(tags.tags || []);
     } catch (error) {
       console.error('Error fetching step tags:', error);
       throw error;
@@ -181,44 +212,81 @@ export default function App() {
 
   const fetchWorkflows = async () => {
     try {
-      const res = await fetch(`${API_BASE}/workflows`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const workflowsData = await res.json();
-        setWorkflows(workflowsData);
-        setLastWorkflowUpdate(new Date());
-      } else if (res.status === 401) {
-        throw { status: 401 };
-      } else {
-        console.error('Failed to fetch workflows:', await res.text());
-      }
+      const workflowsData = await apiClient.getWorkflows();
+      setWorkflows(workflowsData);
+      setLastWorkflowUpdate(new Date());
     } catch (error) {
       console.error('Error fetching workflows:', error);
       throw error;
     }
   };
 
+  // Check for downloads in completed workflows (only for workflows created after page load)
+  const checkForDownloadsInCompletedWorkflows = async () => {
+    try {
+      const workflowsData = await apiClient.getWorkflows();
+      
+      for (const workflow of workflowsData) {
+        if (workflow.status === WorkflowStatus.COMPLETED && 
+            workflow.step_results && 
+            workflow.completed_at) {
+          
+          const completedTime = new Date(workflow.completed_at).getTime();
+          const createdTime = new Date(workflow.created_at).getTime();
+          
+          // Only check workflows created after this page was loaded
+          if (createdTime > pageLoadTimeRef.current) {
+            // Check if this workflow has download results
+            for (const [stepId, result] of Object.entries(workflow.step_results)) {
+              if (stepId === 'download_project_zip' && 
+                  result.download_url && 
+                  result.download_filename) {
+                
+                // Check if this workflow has already been processed for download
+                if (processedDownloadWorkflowsRef.current.has(workflow.id)) {
+                  continue; // Skip if already processed
+                }
+                
+                console.log(`Found completed workflow with download: ${workflow.id}`);
+                console.log(`Download URL: ${result.download_url}`);
+                console.log(`Download filename: ${result.download_filename}`);
+                
+                // Mark this workflow as processed
+                addProcessedWorkflow(workflow.id);
+                
+                // Trigger download
+                await handleDownload(result.download_url, result.download_filename);
+                
+                // Add a success notice
+                setNotices(prev => [{
+                  id: Date.now().toString(),
+                  type: NoticeType.SUCCESS,
+                  severity: 20,
+                  title: 'Download Ready',
+                  message: `ZIP file "${result.download_filename}" is ready for download`,
+                  timestamp: new Date().toISOString(),
+                  dismissible: true
+                }, ...prev]);
+                
+                // Only trigger once per workflow
+                break;
+              }
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking for downloads in completed workflows:', error);
+    }
+  };
+
   const fetchWorkflowDependencies = async (workflowId) => {
     try {
-      const res = await fetch(`${API_BASE}/workflows/${workflowId}/dependencies`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const dependencies = await res.json();
-        setWorkflowDependencies(prev => ({
-          ...prev,
-          [workflowId]: dependencies
-        }));
-      } else if (res.status === 401) {
-        throw { status: 401 };
-      }
+      const dependencies = await apiClient.getWorkflowDependencies(workflowId);
+      setWorkflowDependencies(prev => ({
+        ...prev,
+        [workflowId]: dependencies
+      }));
     } catch (error) {
       console.error('Error fetching workflow dependencies:', error);
       throw error;
@@ -227,20 +295,8 @@ export default function App() {
 
   const fetchNotices = async () => {
     try {
-      const res = await fetch(`${API_BASE}/notices`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (res.ok) {
-        const noticesData = await res.json();
-        setNotices(noticesData);
-      } else if (res.status === 401) {
-        throw { status: 401 };
-      } else {
-        console.error('Failed to fetch notices:', await res.text());
-      }
+      const noticesData = await apiClient.getNotices();
+      setNotices(noticesData);
     } catch (error) {
       console.error('Error fetching notices:', error);
       throw error;
@@ -249,7 +305,7 @@ export default function App() {
 
   const connectWebSocket = () => {
     try {
-      wsRef.current = new WebSocket(`ws://localhost:8002/ws/notices`);
+      wsRef.current = apiClient.createWebSocketConnection();
       
       wsRef.current.onopen = () => {
         console.log('WebSocket connected');
@@ -264,11 +320,17 @@ export default function App() {
           const data = JSON.parse(event.data);
           if (data.type === 'ping') return;
           
-          setNotices(prev => [data, ...prev]);
-
-          if (isDownloadNotification(data)) {
-            // Check all workflows for download results
-            handleDownloadNotification(data);
+          // Handle different message types
+          if (data.type === 'notices' && data.data) {
+            // Add new notices to the list
+            setNotices(prev => [...data.data, ...prev]);
+            
+            // Check for download notifications
+            data.data.forEach(notice => {
+              if (isDownloadNotification(notice)) {
+                handleDownloadNotification(notice);
+              }
+            });
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -306,13 +368,7 @@ export default function App() {
 
   const dismissNotice = async (id) => {
     try {
-      await fetch(`${API_BASE}/notices/${id}`, { 
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await apiClient.dismissNotice(id);
       setNotices(prev => prev.filter(n => n.id !== id));
     } catch (error) {
       console.error('Failed to dismiss notice:', error);
@@ -320,12 +376,13 @@ export default function App() {
   };
 
   const handleLogin = (token) => {
+    apiClient.setAuthToken(token);
     setAuthToken(token);
     setShowLoginModal(false);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('authToken');
+    apiClient.clearAuthToken();
     setAuthToken(null);
     setWorkflows([]);
     setNotices([]);
@@ -336,24 +393,50 @@ export default function App() {
   };
 
   // Handle download notifications
-  const handleDownload = (downloadUrl, filename) => {
+  const handleDownload = async (downloadUrl, filename) => {
     try {
       console.log(`Attempting download: ${downloadUrl} -> ${filename}`);
       
-      // Create a temporary link element to trigger download
+      // Use fetch with authentication headers
+      const response = await fetch(apiClient.getDownloadUrl(downloadUrl), {
+        headers: {
+          'Authorization': `Bearer ${apiClient.authToken}`,
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+      }
+      
+      // Get the blob from the response
+      const blob = await response.blob();
+      
+      // Create a blob URL and trigger download
+      const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      // Add cache-busting parameter to prevent browser caching
-      const cacheBuster = `?t=${Date.now()}`;
-      link.href = `${API_BASE}${downloadUrl}${cacheBuster}`;
+      link.href = blobUrl;
       link.download = filename;
       link.style.display = 'none';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
+      // Clean up the blob URL
+      window.URL.revokeObjectURL(blobUrl);
+      
       console.log(`Download triggered: ${filename}`);
     } catch (error) {
       console.error('Failed to trigger download:', error);
+      // Show error notice
+      setNotices(prev => [{
+        id: Date.now().toString(),
+        type: NoticeType.ERROR,
+        severity: 50,
+        title: 'Download Failed',
+        message: `Failed to download ${filename}: ${error.message}`,
+        timestamp: new Date().toISOString(),
+        dismissible: true
+      }, ...prev]);
     }
   };
 
@@ -363,46 +446,44 @@ export default function App() {
       console.log('Handling download notification:', notice);
       
       // Fetch latest workflows to get the most recent results
-      const res = await fetch(`${API_BASE}/workflows`);
-      if (res.ok) {
-        const workflowsData = await res.json();
-        
-        // Find the most recent completed workflow with download results
-        let mostRecentWorkflow = null;
-        let mostRecentTime = 0;
-        
-        for (const workflow of workflowsData) {
-          if (workflow.status === 'completed' && workflow.step_results) {
-            for (const [stepId, result] of Object.entries(workflow.step_results)) {
-              if (stepId === 'download_project_zip' && result.download_url && result.download_filename) {
-                // Check if this workflow is more recent
-                const workflowTime = new Date(workflow.created_at || workflow.updated_at || 0).getTime();
-                if (workflowTime > mostRecentTime) {
-                  mostRecentTime = workflowTime;
-                  mostRecentWorkflow = { workflow, result };
-                }
+      const workflowsData = await apiClient.getWorkflows();
+      
+      // Find the most recent completed workflow with download results
+      let mostRecentWorkflow = null;
+      let mostRecentTime = 0;
+      
+      for (const workflow of workflowsData) {
+        if (workflow.status === WorkflowStatus.COMPLETED && workflow.step_results) {
+          for (const [stepId, result] of Object.entries(workflow.step_results)) {
+            if (stepId === 'download_project_zip' && result.download_url && result.download_filename) {
+              // Check if this workflow is more recent
+              const workflowTime = new Date(workflow.created_at || workflow.updated_at || 0).getTime();
+              if (workflowTime > mostRecentTime) {
+                mostRecentTime = workflowTime;
+                mostRecentWorkflow = { workflow, result };
               }
             }
           }
         }
+      }
+      
+      // Only trigger download for the most recent workflow
+      if (mostRecentWorkflow) {
+        const { workflow, result } = mostRecentWorkflow;
+        console.log(`Found most recent download result in workflow ${workflow.id}: ${result.download_filename}`);
+        console.log(`Download URL: ${result.download_url}`);
+        console.log(`Workflow time: ${new Date(mostRecentTime).toISOString()}`);
         
-        // Only trigger download for the most recent workflow
-        if (mostRecentWorkflow) {
-          const { workflow, result } = mostRecentWorkflow;
-          console.log(`Found most recent download result in workflow ${workflow.id}: ${result.download_filename}`);
-          console.log(`Download URL: ${result.download_url}`);
-          console.log(`Workflow time: ${new Date(mostRecentTime).toISOString()}`);
-          
-          // Only trigger if the workflow was completed recently (within last 5 minutes)
-          const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-          if (mostRecentTime > fiveMinutesAgo) {
-            handleDownload(result.download_url, result.download_filename);
-          } else {
-            console.log(`Skipping download for old workflow: ${workflow.id} (completed ${new Date(mostRecentTime).toISOString()})`);
-          }
+        // Only trigger if the workflow was completed after this page was loaded
+        if (mostRecentTime > pageLoadTimeRef.current && !processedDownloadWorkflowsRef.current.has(workflow.id)) {
+          // Mark this workflow as processed
+          addProcessedWorkflow(workflow.id);
+          await handleDownload(result.download_url, result.download_filename);
         } else {
-          console.log('No recent completed workflows with download results found');
+          console.log(`Skipping download for old workflow: ${workflow.id} (completed ${new Date(mostRecentTime).toISOString()})`);
         }
+      } else {
+        console.log('No recent completed workflows with download results found');
       }
     } catch (error) {
       console.error('Failed to handle download notification:', error);
@@ -415,49 +496,118 @@ export default function App() {
   };
 
   const createWorkflow = async () => {
+    console.log('createWorkflow called', { workflowName, selectedSteps });
     if (!workflowName || selectedSteps.length === 0) return;
     
     setIsCreatingWorkflow(true);
     try {
-      const definition = {
-        name: workflowName,
-        description: `Workflow with ${selectedSteps.length} steps`,
-        steps: selectedSteps
-      };
-
-      const res = await fetch(`${API_BASE}/workflows`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${authToken}`,
-          'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify(definition)
+      // Prepare steps with auto-filled parameters
+      const preparedSteps = selectedSteps.map(step => {
+        const stepParams = { ...step.params };
+        
+        // Auto-fill project_name for create_project step
+        if (step.step_id === 'create_project' && (!stepParams.project_name || stepParams.project_name.trim() === '')) {
+          stepParams.project_name = workflowName;
+        }
+        
+        return {
+          ...step,
+          params: stepParams
+        };
       });
 
-      if (res.ok) {
-        setWorkflowName('');
-        setSelectedSteps([]);
-        await fetchWorkflows();
-      } else {
-        const errorData = await res.json();
-        console.error('Failed to create workflow:', errorData);
-        // Show validation errors in notices
-        if (errorData.errors) {
-          errorData.errors.forEach(error => {
-            setNotices(prev => [{
-              id: Date.now().toString(),
-              type: 'error',
-              severity: 50,
-              title: 'Workflow Validation Error',
-              message: error,
-              timestamp: new Date().toISOString(),
-              dismissible: true
-            }, ...prev]);
-          });
-        }
+      // Build the workflow definition with proper dependencies
+      const definition = buildWorkflowDefinition(
+        workflowName,
+        `Workflow with ${selectedSteps.length} steps`,
+        preparedSteps,
+        steps
+      );
+      
+      console.log('Sending workflow definition to API:', definition);
+      
+      // Validate workflow definition
+      const validation = validateWorkflowDefinition(definition);
+      console.log('Validation result:', validation);
+      if (!validation.isValid) {
+        console.log('Validation failed with errors:', validation.errors);
+        validation.errors.forEach(error => {
+          setNotices(prev => [{
+            id: Date.now().toString(),
+            type: NoticeType.ERROR,
+            severity: 50,
+            title: 'Workflow Validation Error',
+            message: error,
+            timestamp: new Date().toISOString(),
+            dismissible: true
+          }, ...prev]);
+        });
+        return;
       }
+      console.log('Validation passed, proceeding to API call');
+
+      // Create the workflow using the API
+      console.log('About to call apiClient.createWorkflow with definition:', definition);
+      console.log('apiClient object:', apiClient);
+      console.log('apiClient.createWorkflow method:', apiClient.createWorkflow);
+      const workflow = await apiClient.createWorkflow(definition);
+      
+      console.log('Workflow created successfully:', workflow);
+      console.log('Workflow ID:', workflow.id);
+      console.log('Workflow status:', workflow.status);
+      
+      // Show success notice
+      setNotices(prev => [{
+        id: Date.now().toString(),
+        type: NoticeType.SUCCESS,
+        severity: 20,
+        title: 'Workflow Created',
+        message: `Workflow "${workflowName}" has been created and started (ID: ${workflow.id})`,
+        timestamp: new Date().toISOString(),
+        dismissible: true
+      }, ...prev]);
+      
+      setWorkflowName('');
+      setSelectedSteps([]);
+      console.log('About to fetch workflows to update the list');
+      await fetchWorkflows();
+      console.log('Workflows fetched successfully');
+      
+      // Check for download results after a short delay to handle fast workflows
+      setTimeout(async () => {
+        try {
+          const workflowsData = await apiClient.getWorkflows();
+          const createdWorkflow = workflowsData.find(w => w.id === workflow.id);
+          if (createdWorkflow && createdWorkflow.status === WorkflowStatus.COMPLETED) {
+            console.log('Workflow completed quickly, checking for download results...');
+            // Check for downloads in completed workflows
+            await checkForDownloadsInCompletedWorkflows();
+          }
+        } catch (error) {
+          console.error('Error checking for quick workflow completion:', error);
+        }
+      }, 1000);
     } catch (error) {
       console.error('Failed to create workflow:', error);
+      
+      // Show more specific error message
+      let errorMessage = error.message || 'Failed to create workflow';
+      if (errorMessage.includes('Missing dependencies')) {
+        errorMessage = 'Workflow has missing dependencies. Please check that all required parameters are provided and steps are in the correct order.';
+      } else if (errorMessage.includes('422')) {
+        errorMessage = 'Workflow validation failed. Please check the step configuration and dependencies.';
+      }
+      
+      // Show error in notices
+      setNotices(prev => [{
+        id: Date.now().toString(),
+        type: NoticeType.ERROR,
+        severity: 50,
+        title: 'Workflow Creation Failed',
+        message: errorMessage,
+        timestamp: new Date().toISOString(),
+        dismissible: true
+      }, ...prev]);
     } finally {
       setIsCreatingWorkflow(false);
     }
@@ -469,7 +619,7 @@ export default function App() {
       if (exists) {
         return prev.filter(s => s.step_id !== stepId);
       }
-      return [...prev, { step_id: stepId, params: {} }];
+      return [...prev, createWorkflowStep(stepId)];
     });
   };
 
@@ -485,40 +635,14 @@ export default function App() {
     setSelectedSteps(prev => prev.filter(step => step.step_id !== stepId));
   };
 
-  // Utility function to check if a step failed
-  const isStepFailed = (stepId, workflow) => {
-    const result = workflow?.step_results?.[stepId];
-    if (!result) return false;
-    
-    // Check for common failure indicators in step results
-    if (result.upload_status && result.upload_status.startsWith('failed')) {
-      return true;
-    }
-    
-    // Check for other status fields that might indicate failure
-    for (const [key, value] of Object.entries(result)) {
-      if (key.endsWith('_status') && typeof value === 'string' && value.startsWith('failed')) {
-        return true;
-      }
-    }
-    
-    return false;
+  // Utility function to check if a step failed (using imported utility)
+  const checkStepFailed = (stepId, workflow) => {
+    return isStepFailed(stepId, workflow);
   };
 
-  // Simulate workflow context based on selected steps
-  const getWorkflowContext = () => {
-    const context = {};
-    
-    // Find create_project step and extract its outputs
-    const createProjectStep = selectedSteps.find(step => step.step_id === 'create_project');
-    if (createProjectStep) {
-      // Simulate the outputs that would be available after create_project runs
-      context.project_id = 'simulated-project-id';
-      context.project_path = '/projects/simulated-project-id';
-      context.project_token = 'simulated-project-token';
-    }
-    
-    return context;
+  // Get workflow context based on selected steps
+  const getCurrentWorkflowContext = () => {
+    return getWorkflowContext(selectedWorkflow);
   };
 
   const filteredSteps = () => {
@@ -550,6 +674,20 @@ export default function App() {
     return filtered;
   };
 
+  // Show login modal if no auth token
+  if (!authToken) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white flex items-center justify-center">
+        <LoginModal 
+          isOpen={true} 
+          onLogin={handleLogin} 
+          onClose={() => {}} 
+        />
+      </div>
+    );
+  }
+
+  // Show loading screen if loading with auth token
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white flex items-center justify-center">
@@ -713,7 +851,7 @@ export default function App() {
                       stepDefinition={steps[step.step_id]}
                       onUpdate={updateStepParams}
                       onRemove={removeStep}
-                      workflowContext={getWorkflowContext()}
+                      workflowContext={getCurrentWorkflowContext()}
                     />
                   ))}
                 </div>
@@ -867,12 +1005,14 @@ export default function App() {
         </div>
       </div>
 
-      {/* Login Modal */}
-      <LoginModal 
-        isOpen={showLoginModal} 
-        onLogin={handleLogin} 
-        onClose={() => setShowLoginModal(false)} 
-      />
+      {/* Login Modal - Only shown when showLoginModal is true and we don't have an auth token */}
+      {showLoginModal && !authToken && (
+        <LoginModal 
+          isOpen={showLoginModal} 
+          onLogin={handleLogin} 
+          onClose={() => setShowLoginModal(false)} 
+        />
+      )}
     </div>
   );
 }
