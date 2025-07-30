@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+# Run the Python coverage checker
+# Get the git root directory and run the Python script from the githooks directory
+GIT_ROOT="$(git rev-parse --show-toplevel)"
+python3 "$GIT_ROOT/githooks/pre_commit_coverage.py" 
