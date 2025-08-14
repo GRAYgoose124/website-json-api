@@ -190,8 +190,6 @@ def main():
                 if line_num in missing_lines:
                     print(f"  WARNING: Line {line_num} is not covered by tests")
                     uncovered_changes += 1
-                else:
-                    print(f"  ✓ Line {line_num} is covered by tests")
         
         # Report results
         print(f"\nCoverage check results:")
