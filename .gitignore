@@ -12,6 +12,5 @@ wheels/
 node_modules/
 **/package-lock.json
 
-projects/
-uploads/
+userdata/
 .coverage

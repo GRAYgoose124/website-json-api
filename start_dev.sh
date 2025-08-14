@@ -7,6 +7,10 @@ if [ ! -f "$PROJECT_ROOT/.git/hooks/pre-push" ]; then
     ln -s "$PROJECT_ROOT/githooks/pre-push" "$PROJECT_ROOT/.git/hooks/pre-push"
 fi
 
+if [ ! -f "$PROJECT_ROOT/.git/hooks/pre-commit" ]; then
+    ln -s "$PROJECT_ROOT/githooks/pre-commit" "$PROJECT_ROOT/.git/hooks/pre-commit"
+fi
+
 STEPS_TO_INCLUDE=(project custom test_suite)
 
 INCLUDES=""
