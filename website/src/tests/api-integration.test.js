@@ -10,7 +10,7 @@ const os = require('os');
 
 // API client for testing
 class ApiClient {
-  constructor(baseUrl = 'http://localhost:8003') {
+  constructor(baseUrl = 'http://localhost:8004') {
     this.baseUrl = baseUrl;
     this.authToken = null;
   }
@@ -144,7 +144,7 @@ class TestServer {
       this.serverProcess = spawn('uv', ['run', 'main.py', 
         '--include-steps-root', './bundled_steps/test_suite',
         '--userdata-root', this.tempUserdataDir,
-        '--port', '8003'
+        '--port', '8004'
       ], {
         cwd: projectRoot,
         stdio: ['pipe', 'pipe', 'pipe']
@@ -157,9 +157,11 @@ class TestServer {
         output += data.toString();
         console.log(`[SERVER] ${data.toString().trim()}`);
         
-        // Check if server is ready - look for uvicorn startup message
-        if ((output.includes('Uvicorn running on') && output.includes('8003')) ||
-            (errorOutput.includes('Uvicorn running on') && errorOutput.includes('8003'))) {
+        // Check if server is ready - look for various startup indicators
+        if ((output.includes('Uvicorn running on') && output.includes('8004')) ||
+            (errorOutput.includes('Uvicorn running on') && errorOutput.includes('8004')) ||
+            (output.includes('Starting server on 0.0.0.0:8004')) ||
+            (errorOutput.includes('Starting server on 0.0.0.0:8004'))) {
           this.isReady = true;
           resolve();
         }
@@ -182,9 +184,11 @@ class TestServer {
           console.error(`[SERVER ERROR] ${message}`);
         }
         
-        // Check if server is ready - look for uvicorn startup message
-        if ((output.includes('Uvicorn running on') && output.includes('8003')) ||
-            (errorOutput.includes('Uvicorn running on') && errorOutput.includes('8003'))) {
+        // Check if server is ready - look for various startup indicators
+        if ((output.includes('Uvicorn running on') && output.includes('8004')) ||
+            (errorOutput.includes('Uvicorn running on') && errorOutput.includes('8004')) ||
+            (output.includes('Starting server on 0.0.0.0:8004')) ||
+            (errorOutput.includes('Starting server on 0.0.0.0:8004'))) {
           this.isReady = true;
           resolve();
         }
@@ -232,7 +236,7 @@ class TestServer {
     // Wait for server to be ready
     for (let i = 0; i < 30; i++) {
       try {
-        const response = await fetch('http://localhost:8003/health');
+        const response = await fetch('http://localhost:8004/health');
         if (response.ok) {
           console.log('✅ Server is ready!');
           return true;

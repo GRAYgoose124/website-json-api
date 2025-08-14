@@ -11,7 +11,7 @@ if ! uv run pytest > /tmp/pytest.out 2>&1; then
 fi
 
 # Run JS tests in website/, hide output unless failure
-if ! (cd website && npm test > /tmp/js-test-output 2>&1); then
+if ! (cd website && npm run build && npm run test:all > /tmp/js-test-output 2>&1); then
     cat /tmp/js-test-output
     echo "FAILED: JS tests failed."
     exit 1

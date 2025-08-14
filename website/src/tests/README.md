@@ -20,8 +20,8 @@ This directory contains comprehensive tests for the frontend API integration wit
 
 ### Quick Commands
 ```bash
-# Run all tests
-npm test
+# Run all tests (unit + integration)
+npm run test:all
 
 # Run only unit tests (fast)
 npm run test:unit
@@ -75,7 +75,7 @@ npm test -- src/tests/api-integration.test.js
 ### Integration Test Environment
 - **Jest Environment**: `jsdom` (browser-like)
 - **Real Dependencies**: fetch polyfill, no mocks
-- **Backend Server**: Real Python FastAPI server on port 8003
+- **Backend Server**: Real Python FastAPI server on port 8004
 - **Setup File**: `setup-integration.js`
 
 ## Backend Requirements
@@ -84,12 +84,12 @@ Integration tests require:
 - Python backend server with FastAPI
 - Test credentials: `test_user` / `test_password`
 - Available endpoints: `/health`, `/auth/login`, `/steps`, `/workflows`
-- Port 8003 available for test server
+- Port 8004 available for test server (changed from 8003 to avoid conflicts)
 
 ## Troubleshooting
 
 ### Integration Test Issues
-1. **Port conflicts**: Ensure port 8003 is available
+1. **Port conflicts**: Ensure port 8004 is available (changed from 8003)
 2. **Backend startup**: Check Python dependencies and step definitions
 3. **Authentication**: Verify test credentials work
 4. **Network issues**: Check firewall and connectivity
